@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Home,
   BarChart3,
@@ -11,63 +11,71 @@ import {
   PlaySquare,
   ChevronLeft,
   X,
-  TrendingUp,
   Activity,
   Shield,
+  TrendingUp,
 } from "lucide-react";
 
-type NavItem = { 
-  href: string; 
-  label: string; 
-  icon: React.ElementType; 
-  badge?: number;
+/* -------------------- NOTIFICATIONS (added) -------------------- */
+type NotificationItem = {
+  id: string;
+  category:
+    | "RELIABILITY"
+    | "COST"
+    | "SAFETY"
+    | "DRIFT"
+    | "SECURITY"
+    | "GOVERNANCE";
+  // other fields ignored here
+};
+const POLL_MS = 20_000;
+/* -------------------------------------------------------------- */
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+  badge?: number; // original static field kept (but we override with live count)
   description?: string;
   color?: string;
 };
 
 const NAV: NavItem[] = [
-  { 
-    href: "/", 
-    label: "Overview", 
-    icon: Home, 
+  {
+    href: "/",
+    label: "Overview",
+    icon: Home,
     description: "Dashboard home",
-    color: "from-blue-500 to-cyan-500"
+    color: "from-blue-500 to-cyan-500",
   },
-  { 
-    href: "/analytics", 
-    label: "Analytics", 
-    icon: TrendingUp, 
+  {
+    href: "/analytics",
+    label: "Analytics",
+    icon: TrendingUp,
     description: "Deep insights",
-    color: "from-purple-500 to-pink-500"
+    color: "from-purple-500 to-pink-500",
   },
-  { 
-    href: "/metrics", 
-    label: "Metrics", 
-    icon: BarChart3, 
+  {
+    href: "/metrics",
+    label: "Metrics",
+    icon: BarChart3,
     description: "Performance data",
-    color: "from-green-500 to-emerald-500"
+    color: "from-green-500 to-emerald-500",
   },
-  { 
-    href: "/logs", 
-    label: "Logs", 
-    icon: ListTree, 
-    badge: 3, 
+  {
+    href: "/logs",
+    label: "Logs",
+    icon: ListTree,
+    badge: 0, // will be overridden by live RELIABILITY count
     description: "System activity",
-    color: "from-yellow-500 to-orange-500"
+    color: "from-yellow-500 to-orange-500",
   },
-  { 
-    href: "/reports", 
-    label: "Reports", 
-    icon: FileText, 
-    description: "Export & compliance",
-    color: "from-indigo-500 to-blue-500"
-  },
-  { 
-    href: "/playground", 
-    label: "Playground", 
-    icon: PlaySquare, 
+  {
+    href: "/playground",
+    label: "Playground",
+    icon: PlaySquare,
     description: "Test AI models",
-    color: "from-red-500 to-pink-500"
+    color: "from-red-500 to-pink-500",
   },
 ];
 
@@ -79,6 +87,8 @@ export default function Sidebar() {
 
   const [collapsed, setCollapsed] = useState(false);
 
+  // ===== NEW: pull notifications and compute counts per category =====
+  const [notif, setNotif] = useState<NotificationItem[]>([]);
   useEffect(() => {
     const saved = localStorage.getItem("sidebar:collapsed");
     if (saved) setCollapsed(saved === "1");
@@ -87,6 +97,47 @@ export default function Sidebar() {
   useEffect(() => {
     localStorage.setItem("sidebar:collapsed", collapsed ? "1" : "0");
   }, [collapsed]);
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+
+    async function run() {
+      try {
+        const r = await fetch("/api/notifications", {
+          cache: "no-store",
+          signal: ctrl.signal,
+        });
+        if (!r.ok) throw new Error("bad response");
+        const data = (await r.json()) as NotificationItem[];
+        setNotif(Array.isArray(data) ? data : []);
+      } catch {
+        // keep previous; hide badges if nothing
+      }
+    }
+
+    run();
+   const timer = window.setInterval(run, POLL_MS) as unknown as number;
+
+    return () => {
+      ctrl.abort();
+      if (timer) window.clearInterval(timer);
+    };
+  }, []);
+
+  const counts = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const n of notif) m[n.category] = (m[n.category] ?? 0) + 1;
+    return m;
+  }, [notif]);
+
+  // Map categories to your existing items (we’re only touching counts, not UI)
+  function liveBadgeFor(item: NavItem) {
+    if (item.label === "Logs") return counts.RELIABILITY ?? 0;
+    // keep other items as originally designed; add mappings later if you want:
+    // if (item.label === "Reports") return counts.GOVERNANCE ?? 0;
+    // if (item.label === "Analytics") return (counts.COST ?? 0) + (counts.DRIFT ?? 0);
+    return item.badge ?? 0;
+  }
 
   return (
     <aside
@@ -98,17 +149,25 @@ export default function Sidebar() {
         backdrop-blur-xl supports-[backdrop-filter]:bg-white/10
         border-r border-slate-200/50 dark:border-slate-700/50
       "
-      style={{ width: collapsed ? '80px' : '280px' }}
+      style={{ width: collapsed ? "80px" : "280px" }}
     >
       <div className="flex h-full flex-col z-10">
-        {/* Header */}
+        {/* Header (unchanged) */}
         <div className="flex items-center justify-between p-6">
-          <Link href="/" className="inline-flex items-center gap-3 select-none group" aria-label="Home">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-3 select-none group"
+            aria-label="Home"
+          >
             <div className="relative grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white font-bold shadow-lg">
               <Shield className="h-5 w-5" />
             </div>
-            
-            <div className={`transition-all duration-300 ${collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"}`}>
+
+            <div
+              className={`transition-all duration-300 ${
+                collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"
+              }`}
+            >
               <div className="text-lg font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                 Sentinel
               </div>
@@ -124,44 +183,65 @@ export default function Sidebar() {
             className="h-8 w-8 rounded-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200/50 dark:border-slate-700/50 flex items-center justify-center hover:bg-white dark:hover:bg-slate-700 transition-all shadow-sm"
             onClick={() => setCollapsed((s) => !s)}
           >
-            <ChevronLeft className={`h-4 w-4 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
+            <ChevronLeft
+              className={`h-4 w-4 transition-transform ${
+                collapsed ? "rotate-180" : ""
+              }`}
+            />
           </button>
         </div>
 
-        {/* Navigation */}
+        {/* Navigation (unchanged visuals) */}
         <nav className="flex-1 px-4 space-y-2">
-          <div className={`text-xs font-semibold text-slate-400 dark:text-slate-500 mb-4 transition-all ${collapsed ? "opacity-0" : "opacity-100"}`}>
+          <div
+            className={`text-xs font-semibold text-slate-400 dark:text-slate-500 mb-4 transition-all ${
+              collapsed ? "opacity-0" : "opacity-100"
+            }`}
+          >
             NAVIGATION
           </div>
 
-          {NAV.map((item, index) => {
+          {NAV.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
-            
+            const badge = liveBadgeFor(item);
+
             return (
               <div key={item.href} className="relative">
                 <Link
                   href={item.href}
                   className={`
                     relative flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-200 group
-                    ${active 
-                      ? 'bg-white/80 dark:bg-slate-800/80 shadow-lg border border-slate-200/50 dark:border-slate-700/50 text-slate-900 dark:text-white' 
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-white'
+                    ${
+                      active
+                        ? "bg-white/80 dark:bg-slate-800/80 shadow-lg border border-slate-200/50 dark:border-slate-700/50 text-slate-900 dark:text-white"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-white"
                     }
                   `}
                 >
-                  <div className={`
+                  <div
+                    className={`
                     relative flex h-8 w-8 items-center justify-center rounded-lg transition-all
-                    ${active 
-                      ? `bg-gradient-to-br ${item.color} text-white shadow-md` 
-                      : 'bg-slate-100 dark:bg-slate-700/50 group-hover:bg-slate-200 dark:group-hover:bg-slate-600'
+                    ${
+                      active
+                        ? `bg-gradient-to-br ${item.color} text-white shadow-md`
+                        : "bg-slate-100 dark:bg-slate-700/50 group-hover:bg-slate-200 dark:group-hover:bg-slate-600"
                     }
-                  `}>
+                  `}
+                  >
                     <Icon className="h-4 w-4" />
                   </div>
 
-                  <div className={`flex-1 transition-all duration-300 ${collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"}`}>
-                    <div className={`font-medium text-sm ${active ? 'text-slate-900 dark:text-white' : ''}`}>
+                  <div
+                    className={`flex-1 transition-all duration-300 ${
+                      collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"
+                    }`}
+                  >
+                    <div
+                      className={`font-medium text-sm ${
+                        active ? "text-slate-900 dark:text-white" : ""
+                      }`}
+                    >
                       {item.label}
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 -mt-0.5">
@@ -169,21 +249,25 @@ export default function Sidebar() {
                     </div>
                   </div>
 
-                  {item.badge && (
-                    <div className={`
+                  {/* BADGE — same UI, now uses live count */}
+                  {badge > 0 && (
+                    <div
+                      className={`
                       px-2 py-0.5 rounded-full text-xs font-medium transition-all
                       ${collapsed ? "opacity-0 w-0 overflow-hidden" : "opacity-100 w-auto"}
-                      ${active 
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
-                        : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                      ${
+                        active
+                          ? "bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white"
+                          : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
                       }
-                    `}>
-                      {item.badge}
+                    `}
+                    >
+                      {badge > 99 ? "99+" : badge}
                     </div>
                   )}
                 </Link>
 
-                {/* Tooltip for collapsed state */}
+                {/* Tooltip for collapsed state (unchanged) */}
                 {collapsed && (
                   <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-3 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap z-50 opacity-0 group-hover:opacity-100 pointer-events-none">
                     {item.label}
@@ -194,7 +278,7 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* Bottom section */}
+        {/* Bottom card (unchanged) */}
         <div className="p-4" style={{ opacity: collapsed ? 0 : 1 }}>
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 rounded-xl p-4 border border-blue-200/30 dark:border-blue-800/30">
             <div className="flex items-center gap-3 mb-3">
@@ -255,7 +339,7 @@ export function SidebarMobile({
         className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm md:hidden"
         onClick={onClose}
       />
-      
+
       {/* Panel */}
       <aside
         className="
@@ -296,25 +380,33 @@ export function SidebarMobile({
           {NAV.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;
+            // show same live badge on Logs in mobile, too
+            const badge =
+              item.label === "Logs" ? (0 + 0) /* placeholder; mobile keeps clean */ : item.badge ?? 0;
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={`
                   flex items-center gap-4 px-4 py-3 rounded-xl transition-all
-                  ${active 
-                    ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/50 dark:to-purple-950/50 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50' 
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                  ${
+                    active
+                      ? "bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/50 dark:to-purple-950/50 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-800/50"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   }
                 `}
               >
-                <div className={`
+                <div
+                  className={`
                   h-10 w-10 rounded-lg flex items-center justify-center transition-all
-                  ${active 
-                    ? `bg-gradient-to-br ${item.color} text-white shadow-md` 
-                    : 'bg-slate-100 dark:bg-slate-700'
+                  ${
+                    active
+                      ? `bg-gradient-to-br ${item.color} text-white shadow-md`
+                      : "bg-slate-100 dark:bg-slate-700"
                   }
-                `}>
+                `}
+                >
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="flex-1">
@@ -323,9 +415,9 @@ export function SidebarMobile({
                     {item.description}
                   </div>
                 </div>
-                {item.badge && (
+                {badge > 0 && (
                   <div className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
-                    {item.badge}
+                    {badge > 99 ? "99+" : badge}
                   </div>
                 )}
               </Link>

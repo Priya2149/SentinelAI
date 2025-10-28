@@ -2,22 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import OpenAI from "openai";
 import { z } from "zod";
-// import { runEvaluations } from "@/lib/evaluations"; // if you have this
 
 // --- Helpers ---
-function requiredEnv(name: string): string {
+function getOptionalEnv(name: string): string | null {
   const v = process.env[name];
-  if (!v) {
-    throw new Error(`Missing required env var: ${name}`);
-  }
-  return v;
+  return v ?? null;
 }
 
-const openai = new OpenAI({
-  apiKey: requiredEnv("OPENAI_API_KEY"),
-});
-
-// Strict schema for the request body
 const BodySchema = z.object({
   userId: z.string().min(1).default("anonymous"),
   model: z.string().min(1).default("gpt-4o-mini"),
@@ -26,10 +17,9 @@ const BodySchema = z.object({
 
 type Body = z.infer<typeof BodySchema>;
 
-// Example: POST /api/chat with body { userId, model, prompt }
 export async function POST(req: Request) {
   try {
-    // Parse JSON safely → unknown → validate with Zod (no `any`)
+    // Parse and validate body
     const raw: unknown = await req.json();
     const parsed = BodySchema.safeParse(raw);
     if (!parsed.success) {
@@ -45,7 +35,38 @@ export async function POST(req: Request) {
 
     const { userId, model: modelUsed, prompt }: Body = parsed.data;
 
-    // --- Call your model here ---
+    // --- Init OpenAI client here (runtime only) ---
+    const apiKey = getOptionalEnv("OPENAI_API_KEY");
+    if (!apiKey) {
+      // No key: we won't call OpenAI, but we won't crash build either.
+      // We'll record a FAILED modelCall row so your dashboard still has data.
+      const row = await prisma.modelCall.create({
+        data: {
+          userId: userId,
+          model: modelUsed,
+          prompt: prompt,
+          response: "OpenAI key missing",
+          latencyMs: 0,
+          promptTokens: 0,
+          respTokens: 0,
+          costUsd: 0,
+          status: "FAIL",
+        },
+      });
+
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Missing OPENAI_API_KEY",
+          call: row,
+        },
+        { status: 500 }
+      );
+    }
+
+    const openai = new OpenAI({ apiKey });
+
+    // --- Call model
     const start = Date.now();
     const chatResponse = await openai.chat.completions.create({
       model: modelUsed,
@@ -56,16 +77,23 @@ export async function POST(req: Request) {
     });
     const latencyMs = Date.now() - start;
 
-    const responseText: string = chatResponse.choices[0]?.message?.content ?? "";
-    const promptTokens: number = chatResponse.usage?.prompt_tokens ?? 0;
-    const respTokens: number = chatResponse.usage?.completion_tokens ?? 0;
-    const totalTokens: number = chatResponse.usage?.total_tokens ?? (promptTokens + respTokens);
+    const responseText: string =
+      chatResponse.choices[0]?.message?.content ?? "";
 
-    // Example cost calculation (adjust to your model pricing)
+    const promptTokens: number =
+      chatResponse.usage?.prompt_tokens ?? 0;
+    const respTokens: number =
+      chatResponse.usage?.completion_tokens ?? 0;
+    const totalTokens: number =
+      chatResponse.usage?.total_tokens ??
+      promptTokens + respTokens;
+
+    // (Very rough) cost calc example
     const costUsd: number =
-      (promptTokens / 1000) * 0.0005 + (respTokens / 1000) * 0.0015;
+      (promptTokens / 1000) * 0.0005 +
+      (respTokens / 1000) * 0.0015;
 
-    // Save to DB with explicit mappings
+    // Save call record
     const row = await prisma.modelCall.create({
       data: {
         userId: userId,
@@ -80,9 +108,6 @@ export async function POST(req: Request) {
       },
     });
 
-    // Optionally kick off async evals
-    // void runEvaluations(row.id, prompt, responseText);
-
     return NextResponse.json({
       ok: true,
       call: row,
@@ -96,9 +121,12 @@ export async function POST(req: Request) {
       latencyMs,
     });
   } catch (err: unknown) {
-    // Narrow unknown -> string message
     const message =
-      err instanceof Error ? err.message : typeof err === "string" ? err : "Unknown error";
+      err instanceof Error
+        ? err.message
+        : typeof err === "string"
+        ? err
+        : "Unknown error";
 
     return NextResponse.json(
       { ok: false, error: message },

@@ -18,6 +18,7 @@ import {
   CalendarDays,
   Sparkles,
 } from "lucide-react";
+import LiveTickerPill from "@/components/dashboard/LiveTickerPill";
 
 /** ----- status typing (no 'any') ----- */
 const STATUS_VALUES = ["SUCCESS", "FAIL", "FLAGGED"] as const;
@@ -103,17 +104,45 @@ export default async function Page({
               <span className="text-sm">Refresh</span>
             </Link>
           </div>
+          {/* Live ticker (client component) */}
+{/* place just under the toolbar inside the hero */}
+<div className="absolute top-2 right-3 sm:right-4">
+
+  <LiveTickerPill />
+</div>
+
         </div>
       </div>
 
+      {/* Getting Started (first-run help) */}
+<section className="mt-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+  <div className="flex items-start justify-between gap-4 flex-wrap">
+    <div>
+      <div className="text-sm font-semibold mb-1">Getting started</div>
+      <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+        <li>Open <a className="underline" href="/playground" target="_self">Playground</a> and run a test prompt (free/local works).</li>
+        <li>Or integrate your app by hitting <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">POST /api/logs/ingest</code> from your backend (copy snippets from <a className="underline" href="/docs/connect" target="_self">Connect</a>).</li>
+        <li>Return here — dashboards update in real time.</li>
+      </ol>
+    </div>
+    <div className="flex items-center gap-2">
+      <a href="/playground" className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">Run a test</a>
+      <a href="/docs/connect" className="px-3 py-2 rounded-lg border text-sm">Integration guide</a>
+    </div>
+  </div>
+</section>
+
+
       {/* ===== KPIs ===== */}
       <section className="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+        <Link href={`/logs?status=FLAGGED&range=${range}`} className="block">
         <GlassKpi
           label="Total Calls"
           value={total}
           icon={<Activity className="h-5 w-5" />}
           ring="from-indigo-400 via-violet-500 to-fuchsia-500"
         />
+        </Link>
         <GlassKpi
           label="Success"
           value={ok}

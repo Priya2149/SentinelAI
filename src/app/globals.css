@@ -120,3 +120,26 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .card-hover {
+    @apply transition-all duration-300 will-change-transform;
+  }
+  .card-hover:hover {
+    @apply -translate-y-0.5 shadow-lg shadow-black/5 ring-1 ring-indigo-300/50 dark:ring-indigo-400/30;
+  }
+  .btn-tactile {
+    @apply transition-all duration-200 active:scale-[.98] focus-visible:outline-none
+           focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .fade-in-up {
+      opacity: 0;
+      transform: translateY(6px);
+      animation: fade-in-up .35s ease-out forwards;
+    }
+    @keyframes fade-in-up {
+      to { opacity: 1; transform: translateY(0); }
+    }
+  }
+}

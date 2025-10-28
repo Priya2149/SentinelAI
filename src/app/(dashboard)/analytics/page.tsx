@@ -17,6 +17,8 @@ import {
   PieChart,
 } from "lucide-react";
 
+import VendorComparisonSection from "./VendorComparisonSection";
+
 type ModelRow = {
   model: string;
   calls: number;
@@ -169,6 +171,8 @@ export default async function AnalyticsPage() {
           description="Highest total spend"
         />
       </div>
+
+<VendorComparisonSection />
 
       {/* Model Performance Section (table stays empty when no rows) */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
