@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";   
@@ -16,6 +15,7 @@ function endExclusive(d: Date): Date {
 }
 
 export async function GET(req: Request) {
+  const { prisma } = await import("@/lib/prisma");
   const url = new URL(req.url);
   const from = parseDate(url.searchParams.get("from"));
   const to = parseDate(url.searchParams.get("to"));
