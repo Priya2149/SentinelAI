@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";          // make sure this runs on the server
 export const dynamic = "force-dynamic";   // tells Next/Vercel not to pre-render at build
-
+export const revalidate = 0; 
 function parseDate(s: string | null): Date | null {
   if (!s) return null;
   const d = new Date(s);

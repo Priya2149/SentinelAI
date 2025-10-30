@@ -24,6 +24,7 @@ const COSTS_PER_TOKEN: Record<string, number> = {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
+export const revalidate = 0; 
 
 export async function POST(req: Request) {
   const b = (await req.json()) as Body;

@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";   
 export const dynamic = "force-dynamic";
-
+export const revalidate = 0; 
 function parseDate(s: string | null): Date | null {
   if (!s) return null;
   const d = new Date(s);

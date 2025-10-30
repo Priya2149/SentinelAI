@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0; 
 
 /* ------------ helpers ------------ */
 function percentile(sorted: number[], q: number): number {

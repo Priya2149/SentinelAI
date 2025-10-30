@@ -5,7 +5,7 @@ import { isToxic } from "@/lib/toxicity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
+export const revalidate = 0; 
 export async function POST() {
   try {
     const calls = await prisma.modelCall.findMany({

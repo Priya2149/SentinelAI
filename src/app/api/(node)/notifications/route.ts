@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";       // ✅ add this
 export const dynamic = "force-dynamic";
-
+export const revalidate = 0; 
 export async function GET() {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 

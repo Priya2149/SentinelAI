@@ -8,7 +8,10 @@ function getOptionalEnv(name: string): string | null {
   const v = process.env[name];
   return v ?? null;
 }
+export const runtime = "nodejs";
+export const revalidate = 0; 
 
+export const dynamic = "force-dynamic";
 const BodySchema = z.object({
   userId: z.string().min(1).default("anonymous"),
   model: z.string().min(1).default("gpt-4o-mini"),

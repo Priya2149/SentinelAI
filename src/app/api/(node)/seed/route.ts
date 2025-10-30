@@ -4,7 +4,7 @@ import path from "path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
+export const revalidate = 0; 
 export async function POST() {
   // Block in production / on Vercel
   if (process.env.VERCEL === "1" || process.env.NODE_ENV === "production") {

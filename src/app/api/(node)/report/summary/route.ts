@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 20;
-
+export const revalidate = 0; 
 export async function GET() {
   try {
     const total = await prisma.modelCall.count();
