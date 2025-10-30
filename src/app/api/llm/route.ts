@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-/** You can add more models here if you like */
-const DEFAULT_OLLAMA_MODEL = "llama3.1"; // make sure you've pulled it: `ollama pull llama3.1`
+const DEFAULT_OLLAMA_MODEL = "llama3.1";
 
 type Body = {
   provider?: "ollama" | "openrouter";
@@ -18,17 +17,20 @@ function estimateTokens(text: string): number {
 }
 
 const COSTS_PER_TOKEN: Record<string, number> = {
-  // local models cost $0; set non-zero if you demo cloud providers
   [DEFAULT_OLLAMA_MODEL]: 0,
   "gpt-4o-mini": 0.000002,
 };
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function POST(req: Request) {
   const b = (await req.json()) as Body;
   const provider = b.provider ?? "ollama";
   const model = b.model ?? DEFAULT_OLLAMA_MODEL;
   const prompt = (b.prompt ?? "").trim();
-  const userId = b.userId; // optional; leave undefined for anon demo
+  const userId = b.userId; // optional
 
   if (!prompt) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
@@ -40,7 +42,6 @@ export async function POST(req: Request) {
 
   try {
     if (provider === "ollama") {
-      // requires local Ollama: `ollama serve`
       const r = await fetch(`${OLLAMA_BASE}/api/generate`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -53,7 +54,6 @@ export async function POST(req: Request) {
       const j = await r.json();
       responseText = j.response ?? "";
     } else {
-      // optional: OpenRouter (needs OPENROUTER_API_KEY set)
       const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -74,7 +74,6 @@ export async function POST(req: Request) {
     }
   } catch (e: unknown) {
     const errMsg = e instanceof Error ? e.message : "Unknown error";
-    // Log failed call too (useful for observability)
     const failed = await prisma.modelCall.create({
       data: {
         userId,
@@ -97,10 +96,8 @@ export async function POST(req: Request) {
   const latencyMs = Date.now() - t0;
   const promptTokens = estimateTokens(prompt);
   const respTokens = estimateTokens(responseText);
-  const costUsd =
-    (COSTS_PER_TOKEN[model] ?? 0) * (promptTokens + respTokens);
+  const costUsd = (COSTS_PER_TOKEN[model] ?? 0) * (promptTokens + respTokens);
 
-  // Write success log
   const row = await prisma.modelCall.create({
     data: {
       userId,
