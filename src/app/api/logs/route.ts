@@ -1,16 +1,34 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+
+export const runtime = "nodejs";
+
+
+export const dynamic = "force-dynamic";
+
+
+export const maxDuration = 20;
+
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const take = Math.min(parseInt(searchParams.get("take") ?? "50", 10), 200);
-  const skip = parseInt(searchParams.get("skip") ?? "0", 10);
+  try {
+    const { searchParams } = new URL(req.url);
+    const takeParam = searchParams.get("take");
+    const skipParam = searchParams.get("skip");
 
-  const rows = await prisma.modelCall.findMany({
-    skip, take,
-    orderBy: { createdAt: "desc" },
-    include: { user: true },
-  });
+    const take = Math.min(Number.isFinite(+takeParam!) ? parseInt(takeParam!, 10) : 50, 200);
+    const skip = Number.isFinite(+skipParam!) ? parseInt(skipParam!, 10) : 0;
 
-  return NextResponse.json(rows);
+    const rows = await prisma.modelCall.findMany({
+      skip,
+      take,
+      orderBy: { createdAt: "desc" },
+      include: { user: true },
+    });
+
+    return NextResponse.json(rows);
+  } catch (err) {
+    console.error("/api/logs GET failed:", err);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
 }

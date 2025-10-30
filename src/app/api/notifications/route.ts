@@ -2,12 +2,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+export const runtime = "nodejs";       // ✅ add this
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  // 1) point-in-time alerts (fail/flagged events)
   const rows = await prisma.modelCall.findMany({
     where: { createdAt: { gte: since }, status: { in: ["FAIL", "FLAGGED"] } },
     orderBy: { createdAt: "desc" },
@@ -15,7 +15,6 @@ export async function GET() {
     select: { id: true, status: true, model: true, createdAt: true, user: { select: { email: true } } },
   });
 
-  // 2) rolling aggregates for spikes (error/latency)
   const windowSince = new Date(Date.now() - 10 * 60 * 1000);
   const last10 = await prisma.modelCall.groupBy({
     by: ["model", "status"],
@@ -38,7 +37,7 @@ export async function GET() {
       model: r.model,
       errPct: (r._count._all / Math.max(1, modelTotals[r.model])) * 100,
     }))
-    .filter(x => x.errPct >= 10) // High threshold
+    .filter(x => x.errPct >= 10)
     .map(x => ({
       id: `errspike-${x.model}-${windowSince.getTime()}`,
       ts: new Date().toISOString(),
@@ -63,7 +62,6 @@ export async function GET() {
     fingerprint: `${r.status}:${r.model}`,
   }));
 
-  // merge & de-duplicate by fingerprint (keep most recent)
   const merged = [...errorSpikes, ...items]
     .sort((a, b) => (a.ts < b.ts ? 1 : -1))
     .filter((n, i, arr) => arr.findIndex(m => m.fingerprint === n.fingerprint) === i);
