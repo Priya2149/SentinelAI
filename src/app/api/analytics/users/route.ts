@@ -2,11 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
+export const runtime = "nodejs";   
+export const dynamic = "force-dynamic";
+
 function parseDate(s: string | null): Date | null {
   if (!s) return null;
   const d = new Date(s);
   return Number.isNaN(+d) ? null : d;
 }
+
 function endExclusive(d: Date): Date {
   return new Date(d.getTime() + 24 * 60 * 60 * 1000);
 }
@@ -16,7 +20,6 @@ export async function GET(req: Request) {
   const from = parseDate(url.searchParams.get("from"));
   const to = parseDate(url.searchParams.get("to"));
 
-  // ✅ Use Prisma types instead of `any`
   const where: Prisma.ModelCallWhereInput = {};
 
   if (from || to) {
@@ -34,6 +37,7 @@ export async function GET(req: Request) {
     _avg: { latencyMs: true },
   });
 
+  // Failures per user
   const fails = await prisma.modelCall.groupBy({
     by: ["userId"],
     where: { ...where, status: { not: "SUCCESS" } },
@@ -41,7 +45,11 @@ export async function GET(req: Request) {
   });
 
   const failMap = new Map(fails.map((f) => [f.userId, f._count._all]));
-  const users = await prisma.user.findMany({ select: { id: true, email: true } });
+
+  // Lookup user emails
+  const users = await prisma.user.findMany({
+    select: { id: true, email: true },
+  });
   const emailById = new Map(users.map((u) => [u.id, u.email]));
 
   const rows = byUser.map((u) => ({
@@ -49,7 +57,9 @@ export async function GET(req: Request) {
     calls: u._count._all,
     totalCostUsd: +(u._sum.costUsd ?? 0),
     avgLatencyMs: Math.round(u._avg.latencyMs ?? 0),
-    errorRate: u._count._all ? (failMap.get(u.userId) ?? 0) / u._count._all : 0,
+    errorRate: u._count._all
+      ? (failMap.get(u.userId) ?? 0) / u._count._all
+      : 0,
   }));
 
   return NextResponse.json(rows);

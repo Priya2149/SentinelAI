@@ -2,11 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 function parseDate(s: string | null): Date | null {
   if (!s) return null;
   const d = new Date(s);
   return Number.isNaN(+d) ? null : d;
 }
+
 function endExclusive(d: Date): Date {
   return new Date(d.getTime() + 24 * 60 * 60 * 1000);
 }
@@ -17,7 +21,7 @@ export async function GET(req: Request) {
   const to = parseDate(url.searchParams.get("to"));
   const models: string[] = url.searchParams.getAll("model"); // optional filter(s)
 
-  // ✅ Use Prisma types instead of `any`
+  // Build Prisma "where" dynamically based on optional filters
   const where: Prisma.ModelCallWhereInput = {};
 
   if (from || to) {
@@ -26,10 +30,12 @@ export async function GET(req: Request) {
     if (to) createdAt.lt = endExclusive(to);
     where.createdAt = createdAt;
   }
+
   if (models.length) {
     where.model = { in: models };
   }
 
+  // Calls, avg latency, avg cost per model
   const byModel = await prisma.modelCall.groupBy({
     by: ["model"],
     where,
@@ -37,16 +43,19 @@ export async function GET(req: Request) {
     _avg: { latencyMs: true, costUsd: true },
   });
 
+  // Fail counts per model
   const fails = await prisma.modelCall.groupBy({
     by: ["model"],
     where: { ...where, status: { not: "SUCCESS" } },
     _count: { _all: true },
   });
 
+  // Map model -> failure count for quick lookup
   const failMap = new Map<string, number>(
     fails.map((f) => [f.model, f._count._all])
   );
 
+  // Final response rows
   const rows = byModel.map((m) => ({
     model: m.model,
     calls: m._count._all,
