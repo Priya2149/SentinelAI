@@ -5,8 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0; 
 
-// These thresholds stay here in case you add scores later.
-// They won't actually be used right now since the columns don't exist.
+
 const HALLUCINATION_THRESHOLD = 0.30;
 const TOXICITY_THRESHOLD = 0.10;
 
