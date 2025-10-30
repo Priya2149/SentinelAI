@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+
 import { hallucinationScore } from "@/lib/evals";
 import { isToxic } from "@/lib/toxicity";
 
@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0; 
 export async function POST() {
+  const { prisma } = await import("@/lib/prisma");
   try {
     const calls = await prisma.modelCall.findMany({
       orderBy: { createdAt: "desc" },

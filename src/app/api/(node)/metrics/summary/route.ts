@@ -1,5 +1,5 @@
 // app/api/metrics/summary/route.ts
-import { prisma } from "@/lib/prisma";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +11,7 @@ const HALLUCINATION_THRESHOLD = 0.30;
 const TOXICITY_THRESHOLD = 0.10;
 
 export async function GET() {
+  const { prisma } = await import("@/lib/prisma");
   try {
     // High-level aggregates
     const [countAgg, latencyAgg, costAgg] = await Promise.all([

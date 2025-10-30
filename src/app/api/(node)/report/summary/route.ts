@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 20;
 export const revalidate = 0; 
 export async function GET() {
+  const { prisma } = await import("@/lib/prisma");
   try {
     const total = await prisma.modelCall.count();
     const cost = await prisma.modelCall.aggregate({ _sum: { costUsd: true } });

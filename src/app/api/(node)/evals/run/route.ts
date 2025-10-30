@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+
 import OpenAI from "openai";
 import { z } from "zod";
 
@@ -21,6 +21,7 @@ const BodySchema = z.object({
 type Body = z.infer<typeof BodySchema>;
 
 export async function POST(req: Request) {
+  const { prisma } = await import("@/lib/prisma");
   try {
     // Parse and validate body
     const raw: unknown = await req.json();

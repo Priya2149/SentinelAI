@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+
 
 const DEFAULT_OLLAMA_MODEL = "llama3.1";
 
@@ -27,6 +27,7 @@ export const maxDuration = 30;
 export const revalidate = 0; 
 
 export async function POST(req: Request) {
+  const { prisma } = await import("@/lib/prisma");
   const b = (await req.json()) as Body;
   const provider = b.provider ?? "ollama";
   const model = b.model ?? DEFAULT_OLLAMA_MODEL;

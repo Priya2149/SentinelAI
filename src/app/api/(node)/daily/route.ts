@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+
 import { Prisma } from "@prisma/client";
 
 export const runtime = "nodejs";          // make sure this runs on the server
@@ -12,6 +12,7 @@ function parseDate(s: string | null): Date | null {
 }
 
 export async function GET(req: Request) {
+  const { prisma } = await import("@/lib/prisma");
   try {
     const url = new URL(req.url);
     const from = parseDate(url.searchParams.get("from"));

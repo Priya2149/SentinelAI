@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +12,7 @@ function percentile(sorted: number[], q: number): number {
 }
 
 async function computeLast60s() {
+  const { prisma } = await import("@/lib/prisma");
   const since = new Date(Date.now() - 60 * 1000);
   const rows = await prisma.modelCall.findMany({
     where: { createdAt: { gte: since } }, // change to `ts` if your column is named differently

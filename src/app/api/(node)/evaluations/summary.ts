@@ -1,6 +1,6 @@
 // app/api/evaluations/summary/route.ts
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+
 
 // ---------- API response types ----------
 interface EvalSummaryByKind {
@@ -33,6 +33,7 @@ export const revalidate = 0;
 export const dynamic = "force-dynamic";
 // ------------------- GET: rollup summary -------------------
 export async function GET(req: Request) {
+  const { prisma } = await import("@/lib/prisma");
   const url = new URL(req.url);
   const daysParam = url.searchParams.get("days");
   const days = Number.isFinite(Number(daysParam)) ? parseInt(daysParam || "30", 10) : 30;
@@ -162,6 +163,7 @@ export async function GET(req: Request) {
 
 // ------------- POST: detailed evaluations for a given call -------------
 export async function POST(req: Request) {
+  const { prisma } = await import("@/lib/prisma");
   try {
     const body = (await req.json()) as unknown;
     const callId =
