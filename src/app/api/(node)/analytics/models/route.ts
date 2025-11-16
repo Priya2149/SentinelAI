@@ -1,9 +1,10 @@
+// src/app/api/analytics/models/route.ts
 import { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client"; // ✅ type-only; no runtime code
+import type { Prisma } from "@prisma/client"; // type-only
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const revalidate = 0; // ✅ stop ISR/build from touching this
+export const revalidate = 0;
 
 function parseDate(s: string | null): Date | null {
   if (!s) return null;
@@ -17,7 +18,6 @@ function endExclusive(d: Date): Date {
 
 export async function GET(req: Request) {
   try {
-    // ✅ Lazy import so Prisma client isn't loaded at build
     const { prisma } = await import("@/lib/prisma");
 
     const url = new URL(req.url);
@@ -47,7 +47,7 @@ export async function GET(req: Request) {
 
     const fails = await prisma.modelCall.groupBy({
       by: ["model"],
-      where: { ...where, status: { not: "SUCCESS" } }, // ✅ fixed spread
+      where: { ...where, status: { not: "SUCCESS" } }, // ✅ correct spread
       _count: { _all: true },
     });
 
@@ -67,7 +67,10 @@ export async function GET(req: Request) {
 
     return NextResponse.json(rows);
   } catch (err) {
-    // Prevent a stray build-time hit from crashing the build
-    return NextResponse.json({ error: "Failed to fetch analytics" }, { status: 500 });
+    console.error("analytics/models error", err);
+    return NextResponse.json(
+      { error: "Failed to fetch model analytics" },
+      { status: 500 }
+    );
   }
 }

@@ -9,7 +9,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "kb:ingest": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/ingest-kb.ts"
+    "kb:ingest": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/ingest-kb.ts",
+    "seed": "prisma db seed"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
