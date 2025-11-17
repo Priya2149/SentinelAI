@@ -17,6 +17,7 @@ import {
   PieChart,
 } from "lucide-react";
 
+import { prisma } from "@/lib/prisma";
 import VendorComparisonSection from "./VendorComparisonSection";
 
 type ModelRow = {
@@ -45,26 +46,94 @@ type VendorStats = {
 };
 
 export default async function AnalyticsPage() {
-  // —— LIVE fetch with no caching anywhere ——
   let byModel: ModelRow[] = [];
   let byUser: UserRow[] = [];
   let liveOk = true;
 
   try {
-    const [mRes, uRes] = await Promise.all([
-      fetch("http://localhost:3000/api/analytics/models", {
-        cache: "no-store",
-        next: { revalidate: 0 },
+    // —— Direct Prisma queries ——
+    const [modelData, userData] = await Promise.all([
+      // Models analytics
+      prisma.modelCall.groupBy({
+        by: ["model"],
+        _count: { id: true },
+        _avg: {
+          latencyMs: true,
+          costUsd: true,
+        },
+        _sum: {
+          costUsd: true,
+        },
       }),
-      fetch("http://localhost:3000/api/analytics/users", {
-        cache: "no-store",
-        next: { revalidate: 0 },
+      // Users analytics - FIX: Use the correct field name from your schema
+      prisma.modelCall.groupBy({
+        by: ["userId"], // Changed from userEmail to userId
+        _count: { id: true },
+        _avg: {
+          latencyMs: true,
+        },
+        _sum: {
+          costUsd: true,
+        },
       }),
     ]);
-    liveOk = mRes.ok && uRes.ok;
-    if (mRes.ok) byModel = (await mRes.json()) ?? [];
-    if (uRes.ok) byUser = (await uRes.json()) ?? [];
-  } catch {
+
+    // Get error counts per model
+    const modelErrors = await prisma.modelCall.groupBy({
+      by: ["model"],
+      where: { status: "FAIL" },
+      _count: { id: true },
+    });
+
+    const errorMap = new Map(
+      modelErrors.map((e) => [e.model, e._count.id])
+    );
+
+    // Format model data
+    byModel = modelData.map((m) => ({
+      model: m.model,
+      calls: m._count.id,
+      avgLatencyMs: Math.round(m._avg.latencyMs ?? 0),
+      avgCostUsd: Number((m._avg.costUsd ?? 0).toFixed(6)),
+      errorRate: (errorMap.get(m.model) ?? 0) / Math.max(m._count.id, 1),
+    }));
+
+    // Get error counts per user
+    const userErrors = await prisma.modelCall.groupBy({
+      by: ["userId"], // Changed from userEmail to userId
+      where: { status: "FAIL" },
+      _count: { id: true },
+    });
+
+    const userErrorMap = new Map(
+      userErrors.map((e) => [e.userId, e._count.id])
+    );
+
+    // Get actual user details for display (if you have a User model with email)
+    const userIds = userData.map(u => u.userId).filter(Boolean);
+    const userDetails = await prisma.user.findMany({
+      where: { id: { in: userIds as string[] } },
+      select: { id: true, email: true },
+    });
+
+    const userEmailMap = new Map(
+      userDetails.map(u => [u.id, u.email])
+    );
+
+    // Format user data
+    byUser = userData
+      .filter((u) => u.userId) // Filter out null userIds
+      .map((u) => ({
+        user: userEmailMap.get(u.userId!) ?? u.userId!, // Use email from User table or fallback to userId
+        calls: u._count.id,
+        totalCostUsd: Number((u._sum.costUsd ?? 0).toFixed(6)),
+        avgLatencyMs: Math.round(u._avg.latencyMs ?? 0),
+        errorRate: (userErrorMap.get(u.userId) ?? 0) / Math.max(u._count.id, 1),
+      }));
+
+    liveOk = true;
+  } catch (error) {
+    console.error("Analytics error:", error);
     liveOk = false;
     byModel = [];
     byUser = [];
@@ -79,7 +148,6 @@ export default async function AnalyticsPage() {
   }>();
 
   byModel.forEach((model) => {
-    // Extract provider from model name
     let provider = "other";
     const modelLower = model.model.toLowerCase();
     
@@ -112,14 +180,16 @@ export default async function AnalyticsPage() {
     vendorMap.set(provider, existing);
   });
 
-  const vendorStats: VendorStats[] = Array.from(vendorMap.entries()).map(([provider, data]) => ({
-    provider,
-    calls: data.calls,
-    avgLatencyMs: data.calls > 0 ? data.totalLatency / data.calls : 0,
-    totalCostUsd: data.totalCost,
-    avgCostPerCall: data.calls > 0 ? data.totalCost / data.calls : 0,
-    models: data.models.size,
-  })).sort((a, b) => b.calls - a.calls); // Sort by most calls
+  const vendorStats: VendorStats[] = Array.from(vendorMap.entries())
+    .map(([provider, data]) => ({
+      provider,
+      calls: data.calls,
+      avgLatencyMs: data.calls > 0 ? data.totalLatency / data.calls : 0,
+      totalCostUsd: data.totalCost,
+      avgCostPerCall: data.calls > 0 ? data.totalCost / data.calls : 0,
+      models: data.models.size,
+    }))
+    .sort((a, b) => b.calls - a.calls);
 
   // —— Aggregations with 0 fallbacks ——
   const totalModels = byModel.length;
@@ -137,9 +207,7 @@ export default async function AnalyticsPage() {
     (a, b) => (b.avgCostUsd ?? 0) * (b.calls ?? 0) - (a.avgCostUsd ?? 0) * (a.calls ?? 0)
   )[0];
 
-  // consider "live" only if fetch succeeded and we actually got rows
   const hasData = (byModel.length > 0 || byUser.length > 0) && liveOk;
-
   return (
     <div className="space-y-8 p-6">
       {/* Header */}
