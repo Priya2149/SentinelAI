@@ -1,13 +1,20 @@
 "use client";
 
-import dynamicImport from "next/dynamic";
+import VendorComparisonCard from "@/components/analytics/VendorComparisonCard";
 
-// dynamically load the card on the client only
-const VendorComparisonCard = dynamicImport(
-  () => import("@/components/analytics/VendorComparisonCard"),
-  { ssr: false }
-);
+type VendorStats = {
+  provider: string;
+  calls: number;
+  avgLatencyMs: number;
+  totalCostUsd: number;
+  avgCostPerCall: number;
+  models: number;
+};
 
-export default function VendorComparisonSection() {
-  return <VendorComparisonCard />;
+export default function VendorComparisonSection({ 
+  vendors 
+}: { 
+  vendors: VendorStats[] 
+}) {
+  return <VendorComparisonCard vendors={vendors} />;
 }

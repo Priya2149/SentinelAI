@@ -106,10 +106,10 @@ export default async function Page({
           </div>
           {/* Live ticker (client component) */}
 {/* place just under the toolbar inside the hero */}
-<div className="absolute top-2 right-3 sm:right-4">
+{/* <div className="absolute top-2 right-3 sm:right-4">
 
   <LiveTickerPill />
-</div>
+</div> */}
 
         </div>
       </div>

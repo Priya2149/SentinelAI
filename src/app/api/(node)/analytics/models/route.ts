@@ -47,7 +47,7 @@ export async function GET(req: Request) {
 
     const fails = await prisma.modelCall.groupBy({
       by: ["model"],
-      where: { ...where, status: { not: "SUCCESS" } }, // ✅ correct spread
+      where: { ...where, status: { not: "SUCCESS" } }, 
       _count: { _all: true },
     });
 

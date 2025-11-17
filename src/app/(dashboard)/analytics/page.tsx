@@ -35,6 +35,15 @@ type UserRow = {
   errorRate: number;
 };
 
+type VendorStats = {
+  provider: string;
+  calls: number;
+  avgLatencyMs: number;
+  totalCostUsd: number;
+  avgCostPerCall: number;
+  models: number;
+};
+
 export default async function AnalyticsPage() {
   // —— LIVE fetch with no caching anywhere ——
   let byModel: ModelRow[] = [];
@@ -43,11 +52,11 @@ export default async function AnalyticsPage() {
 
   try {
     const [mRes, uRes] = await Promise.all([
-      fetch("/api/analytics/models", {
+      fetch("http://localhost:3000/api/analytics/models", {
         cache: "no-store",
         next: { revalidate: 0 },
       }),
-      fetch("/api/analytics/users", {
+      fetch("http://localhost:3000/api/analytics/users", {
         cache: "no-store",
         next: { revalidate: 0 },
       }),
@@ -60,6 +69,57 @@ export default async function AnalyticsPage() {
     byModel = [];
     byUser = [];
   }
+
+  // —— Calculate vendor stats from byModel data ——
+  const vendorMap = new Map<string, {
+    calls: number;
+    totalLatency: number;
+    totalCost: number;
+    models: Set<string>;
+  }>();
+
+  byModel.forEach((model) => {
+    // Extract provider from model name
+    let provider = "other";
+    const modelLower = model.model.toLowerCase();
+    
+    if (modelLower.includes("gpt") || modelLower.includes("openai")) {
+      provider = "openai";
+    } else if (modelLower.includes("claude") || modelLower.includes("anthropic")) {
+      provider = "anthropic";
+    } else if (modelLower.includes("gemini") || modelLower.includes("palm") || modelLower.includes("bard")) {
+      provider = "google";
+    } else if (modelLower.includes("llama")) {
+      provider = "meta";
+    } else if (modelLower.includes("mistral")) {
+      provider = "mistral";
+    } else if (modelLower.includes("cohere")) {
+      provider = "cohere";
+    }
+
+    const existing = vendorMap.get(provider) || {
+      calls: 0,
+      totalLatency: 0,
+      totalCost: 0,
+      models: new Set<string>(),
+    };
+
+    existing.calls += model.calls ?? 0;
+    existing.totalLatency += (model.avgLatencyMs ?? 0) * (model.calls ?? 0);
+    existing.totalCost += (model.avgCostUsd ?? 0) * (model.calls ?? 0);
+    existing.models.add(model.model);
+
+    vendorMap.set(provider, existing);
+  });
+
+  const vendorStats: VendorStats[] = Array.from(vendorMap.entries()).map(([provider, data]) => ({
+    provider,
+    calls: data.calls,
+    avgLatencyMs: data.calls > 0 ? data.totalLatency / data.calls : 0,
+    totalCostUsd: data.totalCost,
+    avgCostPerCall: data.calls > 0 ? data.totalCost / data.calls : 0,
+    models: data.models.size,
+  })).sort((a, b) => b.calls - a.calls); // Sort by most calls
 
   // —— Aggregations with 0 fallbacks ——
   const totalModels = byModel.length;
@@ -77,7 +137,7 @@ export default async function AnalyticsPage() {
     (a, b) => (b.avgCostUsd ?? 0) * (b.calls ?? 0) - (a.avgCostUsd ?? 0) * (a.calls ?? 0)
   )[0];
 
-  // consider “live” only if fetch succeeded and we actually got rows
+  // consider "live" only if fetch succeeded and we actually got rows
   const hasData = (byModel.length > 0 || byUser.length > 0) && liveOk;
 
   return (
@@ -104,7 +164,7 @@ export default async function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Key Metrics Overview (0-safe) */}
+      {/* Key Metrics Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <MetricCard
           title="Total Models"
@@ -126,7 +186,7 @@ export default async function AnalyticsPage() {
         />
         <MetricCard
           title="Total Spend"
-          value={`${totalCost.toFixed(4)}`}
+          value={`$${totalCost.toFixed(4)}`}
           change="+0%"
           trend="up"
           icon={<DollarSign className="h-5 w-5" />}
@@ -144,7 +204,7 @@ export default async function AnalyticsPage() {
         />
       </div>
 
-      {/* Insights Cards (0/N-A safe) */}
+      {/* Insights Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <InsightCard
           title="Top Performing Model"
@@ -165,16 +225,17 @@ export default async function AnalyticsPage() {
         <InsightCard
           title="Cost Leader"
           value={mostExpensiveModel?.model || "N/A"}
-          metric={`${(((mostExpensiveModel?.avgCostUsd ?? 0) * (mostExpensiveModel?.calls ?? 0))).toFixed(4)}`}
+          metric={`$${(((mostExpensiveModel?.avgCostUsd ?? 0) * (mostExpensiveModel?.calls ?? 0))).toFixed(4)}`}
           icon={<DollarSign className="h-6 w-6" />}
           color="purple"
           description="Highest total spend"
         />
       </div>
 
-<VendorComparisonSection />
+      {/* Vendor Comparison Section */}
+      <VendorComparisonSection vendors={vendorStats} />
 
-      {/* Model Performance Section (table stays empty when no rows) */}
+      {/* Model Performance Section */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
@@ -302,7 +363,6 @@ export default async function AnalyticsPage() {
                     </TableCell>
                   </tr>
                 ))}
-                {/* when byModel is empty, body stays empty (your requested behavior) */}
               </tbody>
             </table>
           </div>
@@ -427,7 +487,6 @@ export default async function AnalyticsPage() {
                     </TableCell>
                   </tr>
                 ))}
-                {/* when byUser is empty, body stays empty */}
               </tbody>
             </table>
           </div>
@@ -437,7 +496,7 @@ export default async function AnalyticsPage() {
   );
 }
 
-/* ——— small UI helpers (exact same structure) ——— */
+/* ——— UI Components ——— */
 
 function MetricCard({
   title,
@@ -589,6 +648,7 @@ function TableHeader({ children }: { children: React.ReactNode }) {
     </th>
   );
 }
+
 function TableCell({ children }: { children: React.ReactNode }) {
   return <td className="px-6 py-4">{children}</td>;
 }
