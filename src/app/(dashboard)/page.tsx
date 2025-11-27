@@ -4,6 +4,7 @@ export const fetchCache = "force-no-store";
 
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { ensureAlwaysFreshData } from "@/lib/seedDemoDataAggressive"; // ← ADD THIS
 import {
   Activity,
   CheckCircle2,
@@ -18,7 +19,6 @@ import {
   CalendarDays,
   Sparkles,
 } from "lucide-react";
-import LiveTickerPill from "@/components/dashboard/LiveTickerPill";
 
 /** ----- status typing (no 'any') ----- */
 const STATUS_VALUES = ["SUCCESS", "FAIL", "FLAGGED"] as const;
@@ -41,12 +41,15 @@ export default async function Page({
 }: {
   searchParams?: { range?: string; ts?: string };
 }) {
-  const rangeParam = (searchParams?.range as RangeKey) || "24h";
-  const range: RangeKey = rangeParam in RANGE_MS ? (rangeParam as RangeKey) : "24h";
-  const since = new Date(Date.now() - RANGE_MS[range]);
+  // ✨ ENSURE FRESH DEMO DATA FOR PORTFOLIO
+  await ensureAlwaysFreshData();
 
-  // Query within selected range
-  const [counts, latest] = await Promise.all([
+  const rangeParam = (searchParams?.range as RangeKey) || "24h";
+  let range: RangeKey = rangeParam in RANGE_MS ? (rangeParam as RangeKey) : "24h";
+  let since = new Date(Date.now() - RANGE_MS[range]);
+
+  // Query with the requested range
+  let [counts, latest] = await Promise.all([
     prisma.modelCall.groupBy({
       by: ["status"],
       _count: { status: true },
@@ -60,7 +63,31 @@ export default async function Page({
     }),
   ]);
 
-  const total = counts.reduce((a, c) => a + c._count.status, 0);
+  let total = counts.reduce((a, c) => a + c._count.status, 0);
+
+  // Note: With auto-seeding, fallback should rarely be needed
+  // But kept here as safety net
+  if (range === "24h" && total === 0) {
+    range = "3d";
+    since = new Date(Date.now() - RANGE_MS[range]);
+    
+    [counts, latest] = await Promise.all([
+      prisma.modelCall.groupBy({
+        by: ["status"],
+        _count: { status: true },
+        where: { createdAt: { gte: since } },
+      }),
+      prisma.modelCall.findMany({
+        take: 10,
+        orderBy: { createdAt: "desc" },
+        include: { user: true },
+        where: { createdAt: { gte: since } },
+      }),
+    ]);
+    
+    total = counts.reduce((a, c) => a + c._count.status, 0);
+  }
+
   const ok = counts.find((c) => c.status === "SUCCESS")?._count.status ?? 0;
   const fail = counts.find((c) => c.status === "FAIL")?._count.status ?? 0;
   const flagged = counts.find((c) => c.status === "FLAGGED")?._count.status ?? 0;
@@ -70,12 +97,11 @@ export default async function Page({
 
   return (
     <div className="p-0 sm:p-6 relative isolate min-h-full">
-      {/* ===== HERO (badge + description + functional filters) ===== */}
+      {/* ===== HERO ===== */}
       <div className="relative overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white">
         <div className="absolute inset-0 opacity-30 mix-blend-overlay pointer-events-none [background:radial-gradient(60%_50%_at_10%_10%,white,transparent_60%),radial-gradient(40%_40%_at_90%_20%,white,transparent_60%)]" />
         <div className="relative px-6 py-8 sm:px-8 sm:py-10 flex items-center justify-between">
           <div>
-            {/* badge above title */}
             <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-medium backdrop-blur">
               <Sparkles className="h-3.5 w-3.5" />
               Live analytics
@@ -85,13 +111,12 @@ export default async function Page({
               Overview
             </h1>
 
-            {/* short description from your project doc */}
             <p className="mt-1 text-sm sm:text-base text-white/85">
               Logs every LLM call, tracks token cost &amp; latency, and runs lightweight evals for hallucinations and security.
             </p>
           </div>
 
-          {/* Toolbar (links so it works in a Server Component) */}
+          {/* Toolbar */}
           <div className="hidden sm:flex items-center gap-2">
             <ToolbarChip href={`?range=24h`} icon={<CalendarDays className="h-4 w-4" />} label="24h" active={range === "24h"} />
             <ToolbarChip href={`?range=3d`} icon={<CalendarDays className="h-4 w-4" />} label="3d" active={range === "3d"} />
@@ -104,44 +129,36 @@ export default async function Page({
               <span className="text-sm">Refresh</span>
             </Link>
           </div>
-          {/* Live ticker (client component) */}
-{/* place just under the toolbar inside the hero */}
-{/* <div className="absolute top-2 right-3 sm:right-4">
-
-  <LiveTickerPill />
-</div> */}
-
         </div>
       </div>
 
-      {/* Getting Started (first-run help) */}
-<section className="mt-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-  <div className="flex items-start justify-between gap-4 flex-wrap">
-    <div>
-      <div className="text-sm font-semibold mb-1">Getting started</div>
-      <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
-        <li>Open <a className="underline" href="/playground" target="_self">Playground</a> and run a test prompt (free/local works).</li>
-        <li>Or integrate your app by hitting <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">POST /api/logs/ingest</code> from your backend (copy snippets from <a className="underline" href="/docs/connect" target="_self">Connect</a>).</li>
-        <li>Return here — dashboards update in real time.</li>
-      </ol>
-    </div>
-    <div className="flex items-center gap-2">
-      <a href="/playground" className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">Run a test</a>
-      <a href="/docs/connect" className="px-3 py-2 rounded-lg border text-sm">Integration guide</a>
-    </div>
-  </div>
-</section>
-
+      {/* Getting Started */}
+      <section className="mt-6 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="text-sm font-semibold mb-1">Getting started</div>
+            <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
+              <li>Open <a className="underline" href="/playground" target="_self">Playground</a> and run a test prompt (free/local works).</li>
+              <li>Or integrate your app by hitting <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">POST /api/logs/ingest</code> from your backend (copy snippets from <a className="underline" href="/docs/connect" target="_self">Connect</a>).</li>
+              <li>Return here — dashboards update in real time.</li>
+            </ol>
+          </div>
+          <div className="flex items-center gap-2">
+            <a href="/playground" className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-700">Run a test</a>
+            <a href="/docs/connect" className="px-3 py-2 rounded-lg border text-sm">Integration guide</a>
+          </div>
+        </div>
+      </section>
 
       {/* ===== KPIs ===== */}
       <section className="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        <Link href={`/logs?status=FLAGGED&range=${range}`} className="block">
-        <GlassKpi
-          label="Total Calls"
-          value={total}
-          icon={<Activity className="h-5 w-5" />}
-          ring="from-indigo-400 via-violet-500 to-fuchsia-500"
-        />
+        <Link href={`/logs?range=${range}`} className="block">
+          <GlassKpi
+            label="Total Calls"
+            value={total}
+            icon={<Activity className="h-5 w-5" />}
+            ring="from-indigo-400 via-violet-500 to-fuchsia-500"
+          />
         </Link>
         <GlassKpi
           label="Success"
@@ -299,7 +316,7 @@ export default async function Page({
   );
 }
 
-/* ----------------- UI PIECES ----------------- */
+/* ----------------- UI PIECES (unchanged) ----------------- */
 
 function ToolbarChip({
   href,
@@ -336,7 +353,7 @@ function GlassKpi({
   value: number;
   icon: React.ReactNode;
   helper?: string;
-  ring: string; // gradient tailwind e.g. "from-... via-... to-..."
+  ring: string;
 }) {
   return (
     <div className="relative rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/70 dark:bg-gray-900/60 backdrop-blur-xl p-5 shadow-sm">

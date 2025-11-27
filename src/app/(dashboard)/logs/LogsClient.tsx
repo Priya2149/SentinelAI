@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Filter, Download, Eye, MoreVertical, Search as SearchIcon } from "lucide-react";
+import { Filter, Download, Eye, MoreVertical, Search as SearchIcon, X } from "lucide-react";
 
 export type RangeKey = "24h" | "3d" | "7d" | "all";
 export type StatusKey = "SUCCESS" | "FAIL" | "FLAGGED";
@@ -34,6 +34,7 @@ function formatDate(d: Date | string): string {
     second: "2-digit",
   });
 }
+
 function formatRelativeTime(d: Date | string): string {
   const now = new Date();
   const date = new Date(d);
@@ -43,6 +44,7 @@ function formatRelativeTime(d: Date | string): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 }
+
 function csvEscape(cell: string): string {
   return /[",\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
 }
@@ -347,6 +349,7 @@ export default function LogsClient({
   );
 }
 
+// ✅ FIXED: Beautiful Modal with Close Button
 export function RowActions({ row }: { row: LogRow }) {
   const [open, setOpen] = useState<boolean>(false);
   const [menu, setMenu] = useState<boolean>(false);
@@ -373,7 +376,7 @@ export function RowActions({ row }: { row: LogRow }) {
 
   return (
     <div className="relative">
-      {/* Eye opens details drawer */}
+      {/* Eye opens details modal */}
       <button
         className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
         onClick={() => setOpen(true)}
@@ -426,66 +429,162 @@ export function RowActions({ row }: { row: LogRow }) {
         </div>
       )}
 
-      {/* Details Drawer */}
+      {/* ✅ FIXED: Beautiful Modal */}
       {open && (
-        <div className="fixed inset-0 z-40 flex" onClick={() => setOpen(false)} role="dialog" aria-modal="true">
-          <div className="flex-1 bg-black/30 backdrop-blur-sm" />
-          <div
-            className="w-[min(90vw,640px)] h-full bg-white dark:bg-gray-900 border-l p-6 overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Call Details</h3>
-              <button className="px-3 py-1.5 text-sm rounded-lg border hover:bg-gray-50 dark:hover:bg-gray-800" onClick={() => setOpen(false)}>
-                Close
-              </button>
-            </div>
-
-            <div className="mt-4 grid gap-3 text-sm">
-              <InfoRow label="ID" value={<code>{row.id}</code>} />
-              <InfoRow label="Time" value={formatDate(row.at)} />
-              <InfoRow label="User" value={row.user} />
-              <InfoRow label="Model" value={row.model} />
-              <InfoRow label="Latency" value={`${row.latency} ms`} />
-              <InfoRow label="Tokens" value={`${row.tokens} (prompt ${row.promptTokens} / response ${row.respTokens})`} />
-              <InfoRow label="Cost" value={`$${row.cost.toFixed(6)}`} />
-              <InfoRow label="Status" value={row.status as string} />
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <div>
-                <h4 className="text-sm font-semibold mb-1">Input</h4>
-                <pre className="text-xs bg-gray-50 dark:bg-gray-800 p-3 rounded border overflow-auto max-h-56">
-                  {row.input !== undefined ? JSON.stringify(row.input, null, 2) : "—"}
-                </pre>
-              </div>
-              <div>
-                <h4 className="text-sm font-semibold mb-1">Output</h4>
-                <pre className="text-xs bg-gray-50 dark:bg-gray-800 p-3 rounded border overflow-auto max-h-56">
-                  {row.output !== undefined ? JSON.stringify(row.output, null, 2) : "—"}
-                </pre>
-              </div>
-              {row.meta !== undefined && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" 
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
+          
+          {/* Modal */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setOpen(false)}>
+            <div
+              className="relative w-full max-w-2xl max-h-[90vh] bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header with Close Button */}
+              <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
                 <div>
-                  <h4 className="text-sm font-semibold mb-1">Meta</h4>
-                  <pre className="text-xs bg-gray-50 dark:bg-gray-800 p-3 rounded border overflow-auto max-h-56">
-                    {JSON.stringify(row.meta, null, 2)}
-                  </pre>
+                  <h3 className="text-lg font-semibold">Call Details</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Complete information about this API call
+                  </p>
                 </div>
-              )}
+                <button
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                  <span>Close</span>
+                </button>
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="overflow-y-auto p-6 space-y-6" style={{ maxHeight: "calc(90vh - 80px)" }}>
+                {/* Basic Info Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <InfoCard label="ID" value={<code className="text-xs">{row.id}</code>} />
+                  <InfoCard label="Time" value={formatDate(row.at)} />
+                  <InfoCard label="User" value={row.user} />
+                  <InfoCard label="Model" value={row.model} />
+                  <InfoCard label="Latency" value={`${row.latency} ms`} />
+                  <InfoCard 
+                    label="Tokens" 
+                    value={
+                      <div className="space-y-1">
+                        <div className="font-semibold">{row.tokens.toLocaleString()} total</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.promptTokens} prompt · {row.respTokens} response
+                        </div>
+                      </div>
+                    } 
+                  />
+                  <InfoCard label="Cost" value={`$${row.cost.toFixed(6)}`} />
+                  <InfoCard 
+                    label="Status" 
+                    value={
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        row.status === "SUCCESS" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" :
+                        row.status === "FAIL" ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" :
+                        "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                      }`}>
+                        {row.status}
+                      </span>
+                    } 
+                  />
+                </div>
+
+                {/* Input/Output Sections */}
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-blue-500" />
+                        Input
+                      </h4>
+                      <button
+                        onClick={() => copy(typeof row.input === 'string' ? row.input : JSON.stringify(row.input, null, 2))}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <pre className="text-xs bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-auto max-h-64">
+                      {row.input !== undefined ? JSON.stringify(row.input, null, 2) : "—"}
+                    </pre>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-green-500" />
+                        Output
+                      </h4>
+                      <button
+                        onClick={() => copy(typeof row.output === 'string' ? row.output : JSON.stringify(row.output, null, 2))}
+                        className="text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                    <pre className="text-xs bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-auto max-h-64">
+                      {row.output !== undefined ? JSON.stringify(row.output, null, 2) : "—"}
+                    </pre>
+                  </div>
+
+                  {row.meta !== undefined && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-semibold flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-purple-500" />
+                          Metadata
+                        </h4>
+                        <button
+                          onClick={() => copy(JSON.stringify(row.meta, null, 2))}
+                          className="text-xs text-muted-foreground hover:text-foreground"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <pre className="text-xs bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-auto max-h-64">
+                        {JSON.stringify(row.meta, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer with Action Buttons */}
+              <div className="sticky bottom-0 flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+                <button
+                  onClick={() => copy(JSON.stringify(row, null, 2))}
+                  className="px-4 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  Copy All as JSON
+                </button>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                >
+                  Done
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+function InfoCard({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <div className="text-muted-foreground">{label}</div>
-      <div className="col-span-2 break-words">{value}</div>
+    <div className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+      <div className="text-xs text-muted-foreground mb-1">{label}</div>
+      <div className="text-sm font-medium break-words">{value}</div>
     </div>
   );
 }
