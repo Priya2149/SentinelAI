@@ -138,9 +138,10 @@ export default async function Page({
           <div>
             <div className="text-sm font-semibold mb-1">Getting started</div>
             <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
-              <li>Open <a className="underline" href="/playground" target="_self">Playground</a> and run a test prompt (free/local works).</li>
-              <li>Or integrate your app by hitting <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">POST /api/logs/ingest</code> from your backend (copy snippets from <a className="underline" href="/docs/connect" target="_self">Connect</a>).</li>
-              <li>Return here — dashboards update in real time.</li>
+              {/* <a className="underline" href="/playground" target="_self">Playground</a> and run a test prompt (free/local works).</li> */}
+              <li>Explore the charts and tables below to see how SentinelAI tracks AI usage, cost, latency, and errors using realistic demo data. </li>
+              <li>Open the Logs page to inspect individual LLM calls as they would appear in a real deployment.</li>
+              <li>Visit <a className="underline" href="/docs/connect" target="_self">Connect</a> Docs to see how a production app would POST events to `/api/logs/ingest`.</li>
             </ol>
           </div>
           <div className="flex items-center gap-2">

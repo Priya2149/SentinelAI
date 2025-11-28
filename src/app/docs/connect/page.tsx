@@ -3,7 +3,7 @@ export default function ConnectPage() {
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">Connect your models</h1>
-      <p className="text-muted-foreground">Instrument your model calls and POST logs to <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">/api/logs/ingest</code>. Here are simple examples.</p>
+      <p className="text-muted-foreground">Instrument your model calls and POST logs to <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">/api/logs/ingest</code>. Instrument your model calls and POST logs to</p>
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">JavaScript / TypeScript (OpenAI)</h2>

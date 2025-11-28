@@ -202,9 +202,7 @@ export default async function LogsPage({
         <div>
           <h1 className="text-3xl font-bold tracking-tight">API Call Logs</h1>
           <p className="text-muted-foreground mt-2">
-            Logs every LLM call, tracks token cost & latency, and runs
-            lightweight evaluations for hallucinations and security — with
-            real-time monitoring.
+           Logs every LLM call, tracks token cost & latency, and runs lightweight safety checks — all visualized here with realistic demo traffic.
           </p>
         </div>
 

@@ -214,7 +214,7 @@ export default async function AnalyticsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Advanced Analytics</h1>
-          <p className="text-muted-foreground mt-2">Deep insights into model performance and user behavior</p>
+          <p className="text-muted-foreground mt-2">Deep insights into model performance, cost trends, and user behavior using demo traffic.</p>
         </div>
 
         <div className="flex items-center space-x-2">
