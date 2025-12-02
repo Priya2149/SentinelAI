@@ -1,19 +1,12 @@
-// app/(dashboard)/logs/page.tsx
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
 
-// NOTE: This is a **server component** file. Do NOT add "use client" here.
-// Client-only UI (hooks, useEffect, etc.) lives in ./LogsClient.tsx
-
-// If you use Prisma, keep this. Otherwise replace with your own data fetch.
+import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 
 import {
-  Search as SearchIcon,
-  Filter,
-  Download,
   Clock,
   User,
   Zap,
@@ -23,10 +16,14 @@ import {
   XCircle,
   Flag,
 } from "lucide-react";
-import LogsClient, { RowActions } from "./LogsClient";
 
-type RangeKey = "24h" | "3d" | "7d" | "all";
-type StatusKey = "SUCCESS" | "FAIL" | "FLAGGED";
+import LogsClient, {
+  RowActions,
+  type RangeKey,
+  type StatusKey,
+  type LogRow,
+} from "./LogsClient";
+import LiveFeedHeader from "./LiveFeedHeader";
 
 function formatDate(d: Date | string): string {
   return new Date(d).toLocaleString("en-US", {
@@ -37,15 +34,18 @@ function formatDate(d: Date | string): string {
     second: "2-digit",
   });
 }
+
 function formatRelativeTime(d: Date | string): string {
   const now = new Date();
   const date = new Date(d);
-  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  const diffSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
+  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
+  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h ago`;
+  return `${Math.floor(diffSeconds / 86400)}d ago`;
 }
+
 function toNumberOrUndefined(v?: string): number | undefined {
   if (!v?.trim()) return undefined;
   const n = Number(v);
@@ -54,7 +54,7 @@ function toNumberOrUndefined(v?: string): number | undefined {
 
 type SearchParamsShape = {
   q?: string;
-  status?: string; // "SUCCESS,FAIL"
+  status?: string;
   model?: string;
   user?: string;
   minLatency?: string;
@@ -62,29 +62,33 @@ type SearchParamsShape = {
   minCost?: string;
   maxCost?: string;
   range?: RangeKey;
-  auto?: "on" | "off";
-  ts?: string;
+  page?: string;
 };
 
 type ModelCallWithUser = Prisma.ModelCallGetPayload<{ include: { user: true } }>;
 
-type LogRow = {
-  id: string;
-  at: Date;
-  user: string;
-  model: string;
-  latency: number;
-  tokens: number;
-  cost: number;
-  status: StatusKey | string;
-  promptTokens: number;
-  respTokens: number;
-  input?: unknown;
-  output?: unknown;
-  meta?: unknown;
-};
+function buildQueryString(
+  searchParams: SearchParamsShape | undefined,
+  page: number,
+): string {
+  const params = new URLSearchParams();
 
+  if (searchParams?.q) params.set("q", searchParams.q);
+  if (searchParams?.status) params.set("status", searchParams.status);
+  if (searchParams?.model) params.set("model", searchParams.model);
+  if (searchParams?.user) params.set("user", searchParams.user);
+  if (searchParams?.minLatency) params.set("minLatency", searchParams.minLatency);
+  if (searchParams?.maxLatency) params.set("maxLatency", searchParams.maxLatency);
+  if (searchParams?.minCost) params.set("minCost", searchParams.minCost);
+  if (searchParams?.maxCost) params.set("maxCost", searchParams.maxCost);
+  if (searchParams?.range) params.set("range", searchParams.range);
 
+  if (page > 1) params.set("page", String(page));
+  else params.delete("page");
+
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
 
 export default async function LogsPage({
   searchParams,
@@ -92,13 +96,13 @@ export default async function LogsPage({
   searchParams?: SearchParamsShape;
 }) {
   const q = (searchParams?.q ?? "").trim();
+
   const statusList: StatusKey[] =
     (searchParams?.status ?? "")
       .split(",")
       .map((s) => s.trim())
-      .filter(Boolean)
-      .filter(
-        (s): s is StatusKey => s === "SUCCESS" || s === "FAIL" || s === "FLAGGED"
+      .filter((s): s is StatusKey =>
+        ["SUCCESS", "FAIL", "FLAGGED"].includes(s),
       ) ?? [];
 
   const model = (searchParams?.model ?? "").trim();
@@ -118,7 +122,6 @@ export default async function LogsPage({
       ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
       : undefined;
 
-  // Prisma where (replace with your own query if you’re not on Prisma)
   const where: Prisma.ModelCallWhereInput = {
     ...(since ? { createdAt: { gte: since } } : {}),
     ...(statusList.length ? { status: { in: statusList } } : {}),
@@ -156,16 +159,22 @@ export default async function LogsPage({
     include: { user: true },
   });
 
-  const rows: LogRow[] = raw.map((r) => {
+  const allRows: LogRow[] = raw.map((r) => {
     const bag = r as unknown as Record<string, unknown>;
     const input = (bag["input"] ?? bag["prompt"]) as unknown;
     const output = (bag["output"] ?? bag["response"]) as unknown;
     const meta = (bag["meta"] ?? bag["metadata"]) as unknown;
 
-    const promptTokens = Number(r.promptTokens ?? 0);
-    const respTokens = Number(r.respTokens ?? 0);
-    const latency = Number(r.latencyMs ?? 0);
-    const cost = Number(r.costUsd ?? 0);
+    const promptTokens = Number(
+      (r as { promptTokens?: number | null }).promptTokens ?? 0,
+    );
+    const respTokens = Number(
+      (r as { respTokens?: number | null }).respTokens ?? 0,
+    );
+    const latency = Number(
+      (r as { latencyMs?: number | null }).latencyMs ?? 0,
+    );
+    const cost = Number((r as { costUsd?: number | null }).costUsd ?? 0);
 
     return {
       id: r.id,
@@ -184,30 +193,51 @@ export default async function LogsPage({
     };
   });
 
-  const totalCalls = rows.length;
-  const totalCost = rows.reduce((sum, r) => sum + r.cost, 0);
+  const pageSize = 10;
+  const totalCalls = allRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalCalls / pageSize));
+
+  const rawPage = Number(searchParams?.page ?? "1");
+  let page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+  if (page > totalPages) page = totalPages;
+
+  const startIndex = (page - 1) * pageSize;
+  const rows = allRows.slice(startIndex, startIndex + pageSize);
+
+  const totalCost = allRows.reduce((sum, r) => sum + r.cost, 0);
   const avgLatency = Math.round(
-    totalCalls ? rows.reduce((s, r) => s + r.latency, 0) / totalCalls : 0
+    totalCalls ? allRows.reduce((s, r) => s + r.latency, 0) / totalCalls : 0,
   );
   const errorRate =
     totalCalls === 0
       ? 0
-      : (rows.filter((r) => r.status !== "SUCCESS").length / totalCalls) * 100;
-  const lastUpdated = rows[0]?.at ?? new Date();
+      : (allRows.filter((r) => r.status !== "SUCCESS").length / totalCalls) *
+        100;
+
+  const lastUpdated = allRows[0]?.at ?? new Date();
+
+  const hasPrev = page > 1;
+  const hasNext = page < totalPages;
+
+  const entriesLabel =
+    range === "all"
+      ? `(${totalCalls} entries, all time)`
+      : `(${totalCalls} entries, last ${range})`;
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4 px-4 pt-3 pb-4">
+      {/* Header + search/filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">API Call Logs</h1>
-          <p className="text-muted-foreground mt-2">
-           Logs every LLM call, tracks token cost & latency, and runs lightweight safety checks — all visualized here with realistic demo traffic.
+          <h1 className="text-2xl font-bold tracking-tight">API Call Logs</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Logs every LLM call, tracks token cost & latency, and runs lightweight
+            safety checks — all visualized here with realistic demo traffic.
           </p>
         </div>
 
         <LogsClient
-          initialRows={rows}
+          initialRows={allRows}
           lastUpdated={lastUpdated}
           defaults={{
             q,
@@ -219,69 +249,49 @@ export default async function LogsPage({
             minCost,
             maxCost,
             range,
-            auto: (searchParams?.auto as "on" | "off") ?? "off",
           }}
         />
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Stats row */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <QuickStat
-          icon={<Zap className="h-5 w-5" />}
+          icon={<Zap className="h-4 w-4" />}
           label="Total Calls"
           value={totalCalls.toLocaleString()}
           color="blue"
         />
         <QuickStat
-          icon={<DollarSign className="h-5 w-5" />}
+          icon={<DollarSign className="h-4 w-4" />}
           label="Total Cost"
           value={`$${totalCost.toFixed(4)}`}
           color="green"
         />
         <QuickStat
-          icon={<Clock className="h-5 w-5" />}
+          icon={<Clock className="h-4 w-4" />}
           label="Avg Latency"
           value={`${avgLatency}ms`}
           color="purple"
         />
         <QuickStat
-          icon={<AlertTriangle className="h-5 w-5" />}
+          icon={<AlertTriangle className="h-4 w-4" />}
           label="Error Rate"
           value={`${errorRate.toFixed(1)}%`}
           color={errorRate > 10 ? "red" : "orange"}
         />
       </div>
 
-      {/* Table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-sm font-medium">Live Feed</span>
-                <span className="text-xs text-muted-foreground">
-                  ({totalCalls} entries, last{" "}
-                  {range === "all" ? "all time" : range})
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>
-                Auto-refresh:{" "}
-                <strong className="font-medium">
-                  {((searchParams?.auto ?? "off") as "on" | "off").toUpperCase()}
-                </strong>
-              </span>
-              <div className="h-1 w-1 bg-gray-400 rounded-full" />
-              <span>Last updated: {formatRelativeTime(lastUpdated)}</span>
-            </div>
-          </div>
+      {/* Logs table */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border overflow-hidden">
+        {/* Live feed header with auto-refresh toggle */}
+        <div className="px-4 sm:px-6 py-3 border-b bg-gray-50 dark:bg-gray-800/50">
+          <LiveFeedHeader entriesLabel={entriesLabel} lastUpdated={lastUpdated} />
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Scrollable table body */}
+        <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800/30">
+            <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
                 <TableHeader>
                   <div className="flex items-center gap-2">
@@ -303,100 +313,27 @@ export default async function LogsPage({
                 <TableHeader>Actions</TableHeader>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {rows.map((row, index) => (
-                <tr
-                  key={row.id}
-                  className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-all duration-150 ${
-                    index < 5 ? "bg-blue-50/30 dark:bg-blue-950/10" : ""
-                  }`}
-                >
+
+            <tbody className="divide-y">
+              {rows.map((row) => (
+                <tr key={row.id} className="hover:bg-gray-50">
                   <TableCell>
                     <div className="space-y-1">
-                      <div className="font-mono text-sm">{formatDate(row.at)}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="font-mono text-xs">{formatDate(row.at)}</div>
+                      <div className="text-[11px] text-muted-foreground">
                         {formatRelativeTime(row.at)}
                       </div>
                     </div>
                   </TableCell>
-
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full grid place-items-center text-white text-xs font-medium">
-                        {row.user === "—"
-                          ? "U"
-                          : row.user[0]!.toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="font-medium text-sm">
-                          {row.user === "—"
-                            ? "Anonymous"
-                            : row.user.split("@")[0]}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {row.user === "—" ? "Guest User" : row.user.split("@")[1]}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 border">
-                      {row.model}
-                    </span>
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <LatencyIndicator latency={row.latency} />
-                      <div className="text-right">
-                        <div
-                          className={`font-mono text-sm font-medium ${
-                            row.latency < 500
-                              ? "text-green-600"
-                              : row.latency < 1000
-                              ? "text-yellow-600"
-                              : "text-red-600"
-                          }`}
-                        >
-                          {row.latency}ms
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {row.latency < 500 ? "Fast" : row.latency < 1000 ? "Normal" : "Slow"}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="font-mono text-sm font-medium">
-                        {row.tokens.toLocaleString()}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <span>{row.promptTokens}↑</span>
-                        <span>{row.respTokens}↓</span>
-                      </div>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="text-right">
-                      <div className="font-mono text-sm font-medium text-green-600">
-                        ${row.cost.toFixed(5)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {(row.cost * 1000).toFixed(2)}/1K
-                      </div>
-                    </div>
-                  </TableCell>
-
+                  <TableCell>{row.user}</TableCell>
+                  <TableCell>{row.model}</TableCell>
+                  <TableCell>{row.latency}ms</TableCell>
+                  <TableCell>{row.tokens}</TableCell>
+                  <TableCell>${row.cost.toFixed(5)}</TableCell>
                   <TableCell>
                     <StatusBadgeEnhanced status={row.status} />
                   </TableCell>
-
                   <TableCell>
-                    {/* Client-only actions imported from LogsClient.tsx */}
                     <RowActions row={row} />
                   </TableCell>
                 </tr>
@@ -405,21 +342,44 @@ export default async function LogsPage({
           </table>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Showing <span className="font-medium">{Math.min(rows.length, 200)}</span> of{" "}
-              <span className="font-medium">{rows.length}</span> results
-            </div>
-            <div className="flex items-center gap-2">
-              <button className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700">
+        {/* Pagination footer */}
+        <div className="flex items-center justify-between px-4 py-2 border-t bg-gray-50">
+          <div className="text-xs text-muted-foreground">
+            Showing{" "}
+            {totalCalls === 0 ? 0 : startIndex + 1}–
+            {startIndex + rows.length} of {totalCalls}
+          </div>
+          <div className="flex items-center gap-2">
+            {hasPrev ? (
+              <a
+                href={buildQueryString(searchParams, page - 1)}
+                className="px-3 py-1 text-xs border rounded hover:bg-gray-100"
+              >
+                Previous
+              </a>
+            ) : (
+              <button
+                className="px-3 py-1 text-xs border rounded opacity-50"
+                disabled
+              >
                 Previous
               </button>
-              <button className="px-3 py-1.5 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700">
+            )}
+            {hasNext ? (
+              <a
+                href={buildQueryString(searchParams, page + 1)}
+                className="px-3 py-1 text-xs border rounded hover:bg-gray-100"
+              >
+                Next
+              </a>
+            ) : (
+              <button
+                className="px-3 py-1 text-xs border rounded opacity-50"
+                disabled
+              >
                 Next
               </button>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -427,89 +387,98 @@ export default async function LogsPage({
   );
 }
 
-/* ===================== server-side table bits ===================== */
+/* ---------- helper components (no `any`) ---------- */
 
-function TableHeader({ children }: { children: React.ReactNode }) {
+function TableHeader({ children }: { children: ReactNode }) {
   return (
-    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+    <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase text-gray-500">
       {children}
     </th>
   );
 }
-function TableCell({ children }: { children: React.ReactNode }) {
-  return <td className="px-6 py-4">{children}</td>;
+
+function TableCell({ children }: { children: ReactNode }) {
+  return <td className="px-4 py-2 text-xs">{children}</td>;
 }
-function QuickStat({
-  icon,
-  label,
-  value,
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  color: "blue" | "green" | "purple" | "orange" | "red";
-}) {
-  const colorClasses: Record<typeof color, string> = {
-    blue: "from-blue-500 to-blue-600",
-    green: "from-green-500 to-green-600",
-    purple: "from-purple-500 to-purple-600",
-    orange: "from-orange-500 to-orange-600",
-    red: "from-red-500 to-red-600",
+
+type StatusConfig = {
+  icon: ReactNode;
+  classes: string;
+  pulse: boolean;
+};
+
+function StatusBadgeEnhanced({ status }: { status: string | StatusKey }) {
+  const base: StatusConfig = {
+    icon: <AlertTriangle className="h-3 w-3" />,
+    classes:
+      "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600",
+    pulse: false,
   };
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-4">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg bg-gradient-to-r ${colorClasses[color]} text-white`}>{icon}</div>
-        <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-lg font-bold">{value}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-function LatencyIndicator({ latency }: { latency: number }) {
-  const color = latency < 500 ? "bg-green-400" : latency < 1000 ? "bg-yellow-400" : "bg-red-400";
-  const width = `${Math.min((latency / 2000) * 100, 100)}%`;
-  return (
-    <div className="w-12 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-      <div className={`h-full ${color} transition-all duration-300`} style={{ width }} />
-    </div>
-  );
-}
-function StatusBadgeEnhanced({ status }: { status: string }) {
-  const cfg =
-    status === "SUCCESS"
-      ? {
-          icon: <CheckCircle2 className="h-3 w-3" />,
-          cls: "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
-          pulse: false,
-        }
-      : status === "FAIL"
-      ? {
-          icon: <XCircle className="h-3 w-3" />,
-          cls: "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
-          pulse: true,
-        }
-      : status === "FLAGGED"
-      ? {
-          icon: <Flag className="h-3 w-3" />,
-          cls: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800",
-          pulse: true,
-        }
-      : {
-          icon: <AlertTriangle className="h-3 w-3" />,
-          cls: "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600",
-          pulse: false,
-        };
+
+  const map: Partial<Record<string, StatusConfig>> = {
+    SUCCESS: {
+      icon: <CheckCircle2 className="h-3 w-3" />,
+      classes:
+        "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
+      pulse: false,
+    },
+    FAIL: {
+      icon: <XCircle className="h-3 w-3" />,
+      classes:
+        "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
+      pulse: true,
+    },
+    FLAGGED: {
+      icon: <Flag className="h-3 w-3" />,
+      classes:
+        "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800",
+      pulse: true,
+    },
+  };
+
+  const cfg = map[status] ?? base;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cfg.cls} ${cfg.pulse ? "animate-pulse" : ""}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${cfg.classes} ${
+        cfg.pulse ? "animate-pulse" : ""
+      }`}
+    >
       {cfg.icon}
       <span>{status}</span>
     </span>
   );
 }
 
-export type { RangeKey, StatusKey, LogRow };
+type QuickStatProps = {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  color: "blue" | "green" | "purple" | "orange" | "red";
+};
+
+function QuickStat({ icon, label, value, color }: QuickStatProps) {
+  const colorClasses: Record<QuickStatProps["color"], string> = {
+    blue: "from-blue-500 to-blue-600",
+    green: "from-green-500 to-green-600",
+    purple: "from-purple-500 to-purple-600",
+    orange: "from-orange-500 to-orange-600",
+    red: "from-red-500 to-red-600",
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-3">
+      <div className="flex items-center gap-3">
+        <div
+          className={`p-2 rounded-lg bg-gradient-to-r ${colorClasses[color]} text-white`}
+        >
+          {icon}
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-base font-bold">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+}

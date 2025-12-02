@@ -28,18 +28,10 @@ import {
   Eye,
   X as CloseIcon,
   FileDown,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
-
-/* ------------------------- PDF (client-only) ------------------------- */
-// Preview viewer (no SSR)
-const PDFViewerNoSSR = dynamic(
-  () => import("@react-pdf/renderer").then((m) => m.PDFViewer),
-  { ssr: false }
-);
-// The PDF document component (for preview) – client-only
-const ComplianceReportNoSSR = dynamic(() => import("@/components/pdf/ComplianceReport"), {
-  ssr: false,
-});
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 /* ----------------------------- Types ----------------------------- */
 interface DailyMetric {
@@ -75,12 +67,18 @@ interface CustomTooltipProps {
   label?: string;
 }
 
+/* -------------------- layout constants (more compact) -------------------- */
+const CHART_HEIGHT = 180;
+
 /* -------- Safe fetch + demo fallbacks so the page never crashes ------- */
 async function fetchJsonSafe<T>(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<T> {
-  const res = await fetch(input, { headers: { Accept: "application/json" }, ...init });
+  const res = await fetch(input, {
+    headers: { Accept: "application/json" },
+    ...init,
+  });
   const text = await res.text();
   const ct = res.headers.get("content-type") || "";
   if (!res.ok) {
@@ -99,6 +97,7 @@ async function fetchJsonSafe<T>(
   }
   return JSON.parse(text) as T;
 }
+
 function mockDaily(days = 30): DailyMetric[] {
   const out: DailyMetric[] = [];
   for (let i = days - 1; i >= 0; i--) {
@@ -119,6 +118,7 @@ function mockDaily(days = 30): DailyMetric[] {
   }
   return out;
 }
+
 function mockSummary(daily: DailyMetric[]): SummaryData {
   const total = daily.reduce((s, r) => s + r.calls, 0);
   const avg_latency_ms = Math.round(
@@ -145,6 +145,11 @@ function mockSummary(daily: DailyMetric[]): SummaryData {
 
 /* ------------------------- Component ------------------------- */
 export default function MetricsPage() {
+
+   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [dailyData, setDailyData] = useState<DailyMetric[]>([]);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -152,8 +157,87 @@ export default function MetricsPage() {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+const [previewLoading, setPreviewLoading] = useState(false);
 
-  /* --------------------- Data fetch (sequential, typed) --------------------- */
+  // keep modal state in sync with ?preview=1 in the URL
+  useEffect(() => {
+    const isOpen = searchParams.get("preview") === "1";
+    setShowPdfPreview(isOpen);
+  }, [searchParams]);
+
+useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  const handlePopState = () => {
+    // If preview is open, close it instead of leaving the page
+    if (showPdfPreview) {
+      setShowPdfPreview(false);
+      setPreviewLoading(false);
+      setPreviewUrl((url) => {
+        if (url) URL.revokeObjectURL(url);
+        return null;
+      });
+    }
+  };
+
+  window.addEventListener("popstate", handlePopState);
+  return () => window.removeEventListener("popstate", handlePopState);
+}, [showPdfPreview, setShowPdfPreview, setPreviewLoading, setPreviewUrl]);
+
+
+
+async function openPdfPreview() {
+  try {
+
+       if (typeof window !== "undefined") {
+      // Push a new history state so Back can close the modal
+      window.history.pushState(
+        { pdfPreview: true },
+        "",
+        window.location.href
+      );
+    }
+    setPreviewLoading(true);
+    setShowPdfPreview(true);
+
+    const [{ pdf }, { default: ComplianceReport }] = await Promise.all([
+      import("@react-pdf/renderer"),
+      import("@/components/pdf/ComplianceReport"),
+    ]);
+
+    const doc = <ComplianceReport data={pdfData} />;
+    const blob = await pdf(doc).toBlob();
+    const url = URL.createObjectURL(blob);
+
+    setPreviewUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return url;
+    });
+  } catch (err) {
+    console.error("PDF preview failed:", err);
+    alert("Could not generate the preview. Check the console for details.");
+    setShowPdfPreview(false);
+  } finally {
+    setPreviewLoading(false);
+  }
+}
+
+function closePdfPreview() {
+
+    if (typeof window !== "undefined") {
+    // Go back to the previous history entry (same page, no modal)
+    window.history.back();
+  } else {
+  setShowPdfPreview(false);
+  setPreviewUrl((url) => {
+    if (url) URL.revokeObjectURL(url);
+    return null;
+  });
+}
+}
+
   async function fetchData() {
     setLoading(true);
 
@@ -168,7 +252,6 @@ export default function MetricsPage() {
     const summaryUrl = `/api/metrics/summary`;
 
     try {
-      // 1) DAILY
       let dailyJson: DailyResponse;
       try {
         dailyJson = await fetchJsonSafe<DailyResponse>(dailyUrl, {
@@ -186,7 +269,6 @@ export default function MetricsPage() {
         };
       }
 
-      // 2) SUMMARY (computed fallback from daily)
       let summaryJson: SummaryData;
       try {
         summaryJson = await fetchJsonSafe<SummaryData>(summaryUrl, {
@@ -219,13 +301,14 @@ export default function MetricsPage() {
     return () => clearInterval(id);
   }, [timeRange]);
 
-  /* ----- Derived (dashboard) ----- */
+  /* ----- Derived metrics ----- */
   const totalCalls = dailyData.reduce((s, d) => s + d.calls, 0);
   const totalCost = dailyData.reduce((s, d) => s + d.costUsd, 0);
   const avgLatency =
     dailyData.length > 0
       ? Math.round(
-          dailyData.reduce((s, d) => s + d.avgLatencyMs, 0) / dailyData.length
+          dailyData.reduce((s, d) => s + d.avgLatencyMs, 0) /
+            dailyData.length
         )
       : 0;
   const totalErrors = dailyData.reduce((s, d) => s + d.errors, 0);
@@ -247,7 +330,6 @@ export default function MetricsPage() {
       ].filter((i) => i.value > 0)
     : [];
 
-  /* ----- Map API → PDF props ----- */
   const pdfData = useMemo(() => {
     const total = summaryData?.total ?? totalCalls;
     const avgLatencyMs = Math.round(summaryData?.avg_latency_ms ?? avgLatency);
@@ -265,7 +347,7 @@ export default function MetricsPage() {
       summaryData?.statuses.SUCCESS ??
       Math.max(total - failures - flaggedCount, 0);
 
-    const euAiActRisk = "Minimal Risk"; // simple demo label
+    const euAiActRisk = "Minimal Risk";
 
     return {
       totalCalls: total,
@@ -282,7 +364,6 @@ export default function MetricsPage() {
     };
   }, [summaryData, dailyData, totalCalls, totalCost, avgLatency]);
 
-  /* ---------------- PDF download (no PDFDownloadLink) ---------------- */
   async function handleDownloadPdf() {
     try {
       setDownloading(true);
@@ -295,9 +376,6 @@ export default function MetricsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const fileName = `AI_Governance_Report_${new Date()
-        .toISOString()
-        .slice(0, 10)}.pdf`;
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
@@ -312,13 +390,18 @@ export default function MetricsPage() {
   }
 
   /* ------------------------ Tooltips ------------------------ */
+  const tooltipContainerClass =
+    "rounded-2xl px-4 py-3 shadow-xl border " +
+    "bg-white border-slate-200 text-slate-700 " +
+    "dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100";
+
   const CallsTooltip = ({ active, payload, label }: CustomTooltipProps) =>
     active && payload && payload.length ? (
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
-        <p className="font-medium">
+      <div className={tooltipContainerClass}>
+        <p className="text-xs font-medium opacity-80">
           {new Date(label || "").toLocaleDateString()}
         </p>
-        <p className="text-blue-600">
+        <p className="mt-1 text-sm font-semibold text-blue-600 dark:text-blue-400">
           API Calls: {payload[0]?.value?.toLocaleString?.()}
         </p>
       </div>
@@ -326,11 +409,11 @@ export default function MetricsPage() {
 
   const CostTooltip = ({ active, payload, label }: CustomTooltipProps) =>
     active && payload && payload.length ? (
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
-        <p className="font-medium">
+      <div className={tooltipContainerClass}>
+        <p className="text-xs font-medium opacity-80">
           {new Date(label || "").toLocaleDateString()}
         </p>
-        <p className="text-green-600">
+        <p className="mt-1 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
           Daily Cost: ${Number(payload[0]?.value ?? 0).toFixed(4)}
         </p>
       </div>
@@ -338,11 +421,11 @@ export default function MetricsPage() {
 
   const LatencyTooltip = ({ active, payload, label }: CustomTooltipProps) =>
     active && payload && payload.length ? (
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
-        <p className="font-medium">
+      <div className={tooltipContainerClass}>
+        <p className="text-xs font-medium opacity-80">
           {new Date(label || "").toLocaleDateString()}
         </p>
-        <p className="text-purple-600">
+        <p className="mt-1 text-sm font-semibold text-violet-600 dark:text-violet-400">
           Avg Latency: {Math.round(Number(payload[0]?.value ?? 0))}ms
         </p>
       </div>
@@ -350,108 +433,111 @@ export default function MetricsPage() {
 
   const PieTooltip = ({ active, payload }: CustomTooltipProps) =>
     active && payload && payload.length ? (
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
-        <p className="font-medium">
+      <div className={tooltipContainerClass}>
+        <p className="text-sm font-semibold">
           {payload[0]?.name}:{" "}
           {Number(payload[0]?.value ?? 0).toLocaleString()}
         </p>
       </div>
     ) : null;
 
-  const fileName = `AI_Governance_Report_${new Date()
-    .toISOString()
-    .slice(0, 10)}.pdf`;
+const now = new Date();
+const year = now.getFullYear();
+const month = String(now.getMonth() + 1).padStart(2, "0");
+const day = String(now.getDate()).padStart(2, "0");
+
+const fileName = `AI_Governance_Report_${year}-${month}-${day}.pdf`;
+
 
   /* ----------------------------- JSX ----------------------------- */
   return (
-    <div className="space-y-8 p-6">
-      {/* Loading */}
+    <div className="space-y-4 p-3 sm:p-4">
       {loading && !dailyData.length ? (
-        <div className="flex items-center justify-center min-h-[400px] space-x-2">
-          <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
-          <span className="text-lg">Loading metrics...</span>
+        <div className="flex items-center justify-center min-h-[220px] space-x-2">
+          <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
+          <span className="text-sm sm:text-base">Loading metrics...</span>
         </div>
       ) : (
         <>
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+          {/* Header – even more compact */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight leading-tight">
                 Performance Metrics
               </h1>
               <div className="mt-1">
-  <RiskBadge
-    hallucinationRate={summaryData?.hallucination_rate ?? 0}
-    toxicityRate={summaryData?.toxicity_rate ?? 0}
-  />
-</div>
-
-              <p className="text-muted-foreground mt-2">
+                <RiskBadge
+                  hallucinationRate={summaryData?.hallucination_rate ?? 0}
+                  toxicityRate={summaryData?.toxicity_rate ?? 0}
+                />
+              </div>
+              <p className="text-muted-foreground mt-1 text-sm max-w-md">
                 Real-time insights into your AI system performance
               </p>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 justify-end">
+              <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-muted-foreground">
                 <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
                 <span>Last updated: {lastUpdated.toLocaleTimeString()}</span>
               </div>
 
               <select
                 value={timeRange}
-                onChange={(e) =>
-                  setTimeRange(e.target.value as "7d" | "30d")
-                }
-                className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm"
+                onChange={(e) => setTimeRange(e.target.value as "7d" | "30d")}
+                className="px-2 py-1 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-xs"
               >
                 <option value="7d">Last 7 days</option>
                 <option value="30d">Last 30 days</option>
               </select>
 
-              {/* Preview PDF */}
               <button
-                onClick={() => setShowPdfPreview(true)}
-                className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700"
+                onClick={openPdfPreview}
+                disabled={previewLoading}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-xs bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700 disabled:opacity-60"
                 title="Preview PDF"
               >
-                <Eye className="h-4 w-4" />
-                Preview PDF
+                <Eye className="h-3.5 w-3.5" />
+                {previewLoading ? "Preparing…" : "Preview PDF"}
               </button>
 
-              {/* Download PDF (no PDFDownloadLink) */}
               <button
                 onClick={handleDownloadPdf}
-                className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700 disabled:opacity-60"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 border rounded-lg text-xs bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-gray-200 dark:border-gray-700 disabled:opacity-60"
                 title="Download PDF"
                 disabled={downloading}
               >
-                <FileDown className="h-4 w-4" />
+                <FileDown className="h-3.5 w-3.5" />
                 {downloading ? "Preparing…" : "Download PDF"}
               </button>
 
-{/* Burn-rate & forecast */}
-<div className="hidden md:flex items-center text-xs text-muted-foreground border rounded-lg px-3 py-2">
-  {(() => {
-    const minutes =
-      dailyData.length
-        ? (new Date(pdfData.daily[pdfData.daily.length-1].date).getTime() -
-           new Date(pdfData.daily[0].date).getTime()) / 60000 || 1
-        : 1;
-    const burnPerMin = minutes > 0 ? (totalCost / minutes) : 0;
-    const projectedMonthly = burnPerMin * 60 * 24 * 30;
-    return (
-      <span>Burn ${burnPerMin.toFixed(4)}/min · ~${projectedMonthly.toFixed(2)}/mo</span>
-    );
-  })()}
-</div>
+              <div className="hidden md:flex items-center text-[11px] text-muted-foreground border rounded-lg px-2.5 py-1">
+                {(() => {
+                  const minutes = dailyData.length
+                    ? (new Date(
+                        pdfData.daily[pdfData.daily.length - 1].date
+                      ).getTime() -
+                        new Date(pdfData.daily[0].date).getTime()) /
+                        60000 || 1
+                    : 1;
+                  const burnPerMin = minutes > 0 ? totalCost / minutes : 0;
+                  const projectedMonthly = burnPerMin * 60 * 24 * 30;
+                  return (
+                    <span>
+                      Burn ${burnPerMin.toFixed(4)}/min · ~$
+                      {projectedMonthly.toFixed(2)}/mo
+                    </span>
+                  );
+                })()}
+              </div>
 
               <button
                 onClick={fetchData}
                 disabled={loading}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs disabled:opacity-50"
               >
                 <RefreshCw
-                  className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
+                  className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
                 />
                 Refresh
               </button>
@@ -459,15 +545,17 @@ export default function MetricsPage() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatsCard
               title="Total Calls"
               value={totalCalls.toLocaleString()}
               change={`+${(
-                totalCalls / Math.max(dailyData.length, 1) / 10
+                totalCalls /
+                Math.max(dailyData.length, 1) /
+                10
               ).toFixed(1)}%`}
               trend="up"
-              icon={<Activity className="h-5 w-5" />}
+              icon={<Activity className="h-4 w-4" />}
               color="blue"
             />
             <StatsCard
@@ -475,7 +563,7 @@ export default function MetricsPage() {
               value={`$${totalCost.toFixed(4)}`}
               change={`+${(totalCost * 100).toFixed(1)}%`}
               trend="up"
-              icon={<DollarSign className="h-5 w-5" />}
+              icon={<DollarSign className="h-4 w-4" />}
               color="green"
             />
             <StatsCard
@@ -483,7 +571,7 @@ export default function MetricsPage() {
               value={`${avgLatency}ms`}
               change={avgLatency < 500 ? "-12%" : "+8%"}
               trend={avgLatency < 500 ? "up" : "down"}
-              icon={<Clock className="h-5 w-5" />}
+              icon={<Clock className="h-4 w-4" />}
               color="purple"
             />
             <StatsCard
@@ -491,18 +579,27 @@ export default function MetricsPage() {
               value={`${overallErrorRate.toFixed(1)}%`}
               change={overallErrorRate < 5 ? "-2.4%" : "+1.2%"}
               trend={overallErrorRate < 5 ? "up" : "down"}
-              icon={<AlertTriangle className="h-5 w-5" />}
+              icon={<AlertTriangle className="h-4 w-4" />}
               color={overallErrorRate > 10 ? "red" : "orange"}
             />
           </div>
 
-          {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ChartCard title="API Calls Trend" description="Daily API call volume">
-              <ResponsiveContainer width="100%" height={300}>
+          {/* Charts – DESKTOP GRID */}
+          <div className="hidden lg:grid lg:grid-cols-2 lg:gap-3 xl:gap-4">
+            <ChartCard
+              title="API Calls Trend"
+              description="Daily API call volume"
+            >
+              <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
                 <AreaChart data={dailyData}>
                   <defs>
-                    <linearGradient id="callsGradient" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient
+                      id="callsGradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
@@ -511,7 +608,7 @@ export default function MetricsPage() {
                   <XAxis
                     dataKey="date"
                     stroke="#6b7280"
-                    fontSize={12}
+                    fontSize={11}
                     tickFormatter={(v: string) =>
                       new Date(v).toLocaleDateString("en-US", {
                         month: "short",
@@ -519,7 +616,7 @@ export default function MetricsPage() {
                       })
                     }
                   />
-                  <YAxis stroke="#6b7280" fontSize={12} />
+                  <YAxis stroke="#6b7280" fontSize={11} />
                   <Tooltip content={<CallsTooltip />} />
                   <Area
                     type="monotone"
@@ -532,11 +629,20 @@ export default function MetricsPage() {
               </ResponsiveContainer>
             </ChartCard>
 
-            <ChartCard title="Cost Analysis" description="Daily spending trends">
-              <ResponsiveContainer width="100%" height={300}>
+            <ChartCard
+              title="Cost Analysis"
+              description="Daily spending trends"
+            >
+              <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
                 <AreaChart data={dailyData}>
                   <defs>
-                    <linearGradient id="costGradient" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient
+                      id="costGradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
                       <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                     </linearGradient>
@@ -545,7 +651,7 @@ export default function MetricsPage() {
                   <XAxis
                     dataKey="date"
                     stroke="#6b7280"
-                    fontSize={12}
+                    fontSize={11}
                     tickFormatter={(v: string) =>
                       new Date(v).toLocaleDateString("en-US", {
                         month: "short",
@@ -553,7 +659,7 @@ export default function MetricsPage() {
                       })
                     }
                   />
-                  <YAxis stroke="#6b7280" fontSize={12} />
+                  <YAxis stroke="#6b7280" fontSize={11} />
                   <Tooltip content={<CostTooltip />} />
                   <Area
                     type="monotone"
@@ -566,14 +672,17 @@ export default function MetricsPage() {
               </ResponsiveContainer>
             </ChartCard>
 
-            <ChartCard title="Response Time" description="Average latency performance">
-              <ResponsiveContainer width="100%" height={300}>
+            <ChartCard
+              title="Response Time"
+              description="Average latency performance"
+            >
+              <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
                 <LineChart data={dailyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis
                     dataKey="date"
                     stroke="#6b7280"
-                    fontSize={12}
+                    fontSize={11}
                     tickFormatter={(v: string) =>
                       new Date(v).toLocaleDateString("en-US", {
                         month: "short",
@@ -581,30 +690,33 @@ export default function MetricsPage() {
                       })
                     }
                   />
-                  <YAxis stroke="#6b7280" fontSize={12} />
+                  <YAxis stroke="#6b7280" fontSize={11} />
                   <Tooltip content={<LatencyTooltip />} />
                   <Line
                     type="monotone"
                     dataKey="avgLatencyMs"
                     stroke="#8b5cf6"
-                    strokeWidth={3}
-                    dot={{ fill: "#8b5cf6", strokeWidth: 2, r: 4 }}
-                    activeDot={{ r: 6, stroke: "#8b5cf6", strokeWidth: 2 }}
+                    strokeWidth={2.2}
+                    dot={{ fill: "#8b5cf6", strokeWidth: 2, r: 3.5 }}
+                    activeDot={{ r: 5, stroke: "#8b5cf6", strokeWidth: 2 }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </ChartCard>
 
-            <ChartCard title="Error Distribution" description="Success vs failure rates">
-              <div className="h-[300px] flex items-center justify-center">
+            <ChartCard
+              title="Error Distribution"
+              description="Success vs failure rates"
+            >
+              <div className="h-[180px] flex items-center justify-center">
                 <ResponsiveContainer width="80%" height="100%">
                   <PieChart>
                     <Pie
                       data={pieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
+                      innerRadius={45}
+                      outerRadius={80}
                       paddingAngle={5}
                       dataKey="value"
                     >
@@ -616,14 +728,14 @@ export default function MetricsPage() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="mt-4 flex justify-center space-x-6">
+              <div className="mt-2 flex justify-center flex-wrap gap-3">
                 {pieData.map((item, idx) => (
                   <div key={idx} className="flex items-center space-x-2">
                     <div
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: item.color }}
                     />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                    <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                       {item.name} ({Number(item.value).toLocaleString()})
                     </span>
                   </div>
@@ -632,135 +744,349 @@ export default function MetricsPage() {
             </ChartCard>
           </div>
 
-          {/* Daily Breakdown */}
+          {/* Charts – MOBILE CAROUSEL */}
+          <div className="lg:hidden -mx-3 sm:mx-0 overflow-x-auto pb-1.5">
+            <div className="flex gap-3 sm:gap-4 px-3">
+              <div className="min-w-[260px] max-w-sm flex-1">
+                <ChartCard
+                  title="API Calls Trend"
+                  description="Daily API call volume"
+                >
+                  <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+                    <AreaChart data={dailyData}>
+                      <defs>
+                        <linearGradient
+                          id="callsGradientMobile"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#3b82f6"
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#3b82f6"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#6b7280"
+                        fontSize={10}
+                        tickFormatter={(v: string) =>
+                          new Date(v).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        }
+                      />
+                      <YAxis stroke="#6b7280" fontSize={10} />
+                      <Tooltip content={<CallsTooltip />} />
+                      <Area
+                        type="monotone"
+                        dataKey="calls"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        fill="url(#callsGradientMobile)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </div>
+
+              <div className="min-w-[260px] max-w-sm flex-1">
+                <ChartCard
+                  title="Cost Analysis"
+                  description="Daily spending trends"
+                >
+                  <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+                    <AreaChart data={dailyData}>
+                      <defs>
+                        <linearGradient
+                          id="costGradientMobile"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#10b981"
+                            stopOpacity={0.3}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#10b981"
+                            stopOpacity={0}
+                          />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#6b7280"
+                        fontSize={10}
+                        tickFormatter={(v: string) =>
+                          new Date(v).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        }
+                      />
+                      <YAxis stroke="#6b7280" fontSize={10} />
+                      <Tooltip content={<CostTooltip />} />
+                      <Area
+                        type="monotone"
+                        dataKey="costUsd"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        fill="url(#costGradientMobile)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </div>
+
+              <div className="min-w-[260px] max-w-sm flex-1">
+                <ChartCard
+                  title="Response Time"
+                  description="Average latency performance"
+                >
+                  <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+                    <LineChart data={dailyData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="date"
+                        stroke="#6b7280"
+                        fontSize={10}
+                        tickFormatter={(v: string) =>
+                          new Date(v).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })
+                        }
+                      />
+                      <YAxis stroke="#6b7280" fontSize={10} />
+                      <Tooltip content={<LatencyTooltip />} />
+                      <Line
+                        type="monotone"
+                        dataKey="avgLatencyMs"
+                        stroke="#8b5cf6"
+                        strokeWidth={2.2}
+                        dot={{ fill: "#8b5cf6", strokeWidth: 2, r: 3.5 }}
+                        activeDot={{
+                          r: 5,
+                          stroke: "#8b5cf6",
+                          strokeWidth: 2,
+                        }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartCard>
+              </div>
+
+              <div className="min-w-[260px] max-w-sm flex-1">
+                <ChartCard
+                  title="Error Distribution"
+                  description="Success vs failure rates"
+                >
+                  <div className="h-[180px] flex items-center justify-center">
+                    <ResponsiveContainer width="85%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={75}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {pieData.map((entry, idx) => (
+                            <Cell key={idx} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<PieTooltip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="mt-2 flex justify-center flex-wrap gap-3">
+                    {pieData.map((item, idx) => (
+                      <div key={idx} className="flex items-center space-x-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          {item.name} ({Number(item.value).toLocaleString()})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </ChartCard>
+              </div>
+            </div>
+          </div>
+
+          {/* Daily Breakdown – collapsible to save vertical space */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
+            <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between gap-2">
                 <div>
-                  <h2 className="text-lg font-semibold">Daily Breakdown</h2>
-                  <p className="text-sm text-muted-foreground">
+                  <h2 className="text-sm sm:text-base font-semibold">
+                    Daily Breakdown
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
                     Detailed metrics by day
                   </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    {dailyData.length} days tracked
-                  </span>
+                <div className="flex items-center gap-3">
+                  <div className="hidden sm:flex items-center space-x-1.5 text-xs text-muted-foreground">
+                    <BarChart3 className="h-4 w-4" />
+                    <span>{dailyData.length} days tracked</span>
+                  </div>
+                  <button
+                    onClick={() => setShowBreakdown((v) => !v)}
+                    className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700"
+                  >
+                    {showBreakdown ? (
+                      <>
+                        <ChevronUp className="h-3.5 w-3.5" />
+                        Hide table
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3.5 w-3.5" />
+                        Show table
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
 
-            <div className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-800/50">
-                    <tr>
-                      <TableHeader>Date</TableHeader>
-                      <TableHeader>API Calls</TableHeader>
-                      <TableHeader>Daily Cost</TableHeader>
-                      <TableHeader>Avg Latency</TableHeader>
-                      <TableHeader>Errors</TableHeader>
-                      <TableHeader>Error Rate</TableHeader>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {dailyData
-                      .slice()
-                      .reverse()
-                      .slice(0, 15)
-                      .map((row) => (
-                        <tr
-                          key={row.date}
-                          className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-                        >
-                          <TableCell>
-                            <div className="font-medium">
-                              {new Date(row.date).toLocaleDateString("en-US", {
-                                month: "short",
-                                day: "numeric",
-                                weekday: "short",
-                              })}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <Activity className="h-4 w-4 text-blue-500" />
-                              <span className="font-mono font-medium">
-                                {row.calls.toLocaleString()}
+            {showBreakdown && (
+              <div className="overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs sm:text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-800/50">
+                      <tr>
+                        <TableHeader>Date</TableHeader>
+                        <TableHeader>API Calls</TableHeader>
+                        <TableHeader>Daily Cost</TableHeader>
+                        <TableHeader>Avg Latency</TableHeader>
+                        <TableHeader>Errors</TableHeader>
+                        <TableHeader>Error Rate</TableHeader>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {dailyData
+                        .slice()
+                        .reverse()
+                        .slice(0, 10) // fewer rows for compactness
+                        .map((row) => (
+                          <tr
+                            key={row.date}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                          >
+                            <TableCell>
+                              <div className="font-medium">
+                                {new Date(row.date).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    month: "short",
+                                    day: "numeric",
+                                    weekday: "short",
+                                  }
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <Activity className="h-4 w-4 text-blue-500" />
+                                <span className="font-mono font-medium">
+                                  {row.calls.toLocaleString()}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-mono text-green-600 font-medium">
+                                ${row.costUsd.toFixed(4)}
                               </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-mono text-green-600 font-medium">
-                              ${row.costUsd.toFixed(4)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <div
-                                className={`w-2 h-2 rounded-full ${
-                                  row.avgLatencyMs < 400
-                                    ? "bg-green-400"
-                                    : row.avgLatencyMs < 700
-                                    ? "bg-yellow-400"
-                                    : "bg-red-400"
-                                }`}
-                              />
-                              <span className="font-mono">
-                                {row.avgLatencyMs}ms
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              {row.errors > 0 ? (
-                                <AlertTriangle className="h-4 w-4 text-red-500" />
-                              ) : (
-                                <div className="w-4 h-4" />
-                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <div
+                                  className={`w-2 h-2 rounded-full ${
+                                    row.avgLatencyMs < 400
+                                      ? "bg-green-400"
+                                      : row.avgLatencyMs < 700
+                                      ? "bg-yellow-400"
+                                      : "bg-red-400"
+                                  }`}
+                                />
+                                <span className="font-mono">
+                                  {row.avgLatencyMs}ms
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                {row.errors > 0 ? (
+                                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                                ) : (
+                                  <div className="w-4 h-4" />
+                                )}
+                                <span
+                                  className={
+                                    row.errors > 5
+                                      ? "text-red-600 font-medium"
+                                      : ""
+                                  }
+                                >
+                                  {row.errors}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
                               <span
-                                className={
-                                  row.errors > 5 ? "text-red-600 font-medium" : ""
-                                }
+                                className={`font-medium ${
+                                  row.errorRate > 0.1
+                                    ? "text-red-600"
+                                    : row.errorRate > 0.05
+                                    ? "text-yellow-600"
+                                    : "text-green-600"
+                                }`}
                               >
-                                {row.errors}
+                                {(row.errorRate * 100).toFixed(1)}%
                               </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={`font-medium ${
-                                row.errorRate > 0.1
-                                  ? "text-red-600"
-                                  : row.errorRate > 0.05
-                                  ? "text-yellow-600"
-                                  : "text-green-600"
-                              }`}
-                            >
-                              {(row.errorRate * 100).toFixed(1)}%
-                            </span>
-                          </TableCell>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+                            </TableCell>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </>
       )}
 
-      {/* --------------------- PDF PREVIEW MODAL --------------------- */}
+      {/* PDF PREVIEW MODAL */}
       {showPdfPreview && (
         <div className="fixed inset-0 z-50">
           <div
             className="absolute inset-0 bg-black/70"
-            onClick={() => setShowPdfPreview(false)}
+            onClick={() => closePdfPreview}
             aria-hidden
           />
           <div className="absolute inset-4 bg-white dark:bg-gray-900 rounded-xl shadow-xl flex flex-col">
-            {/* Modal top bar */}
             <div className="flex items-center gap-3 px-4 py-2 border-b dark:border-gray-800">
               <div className="text-sm font-medium">PDF Preview</div>
 
@@ -776,7 +1102,7 @@ export default function MetricsPage() {
                 </button>
 
                 <button
-                  onClick={() => setShowPdfPreview(false)}
+                  onClick={() => closePdfPreview}
                   className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 border-gray-200 dark:border-gray-700"
                   title="Close preview"
                 >
@@ -786,11 +1112,26 @@ export default function MetricsPage() {
               </div>
             </div>
 
-            {/* Full-height PDF viewer (no SSR) */}
             <div className="flex-1 min-h-0">
-              <PDFViewerNoSSR style={{ width: "100%", height: "100%" }}>
-                <ComplianceReportNoSSR data={pdfData} />
-              </PDFViewerNoSSR>
+              {previewLoading && (
+                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                  Generating preview…
+                </div>
+              )}
+
+              {!previewLoading && previewUrl && (
+                <iframe
+                  src={previewUrl}
+                  className="w-full h-full rounded-b-xl"
+                  title="PDF preview"
+                />
+              )}
+
+              {!previewLoading && !previewUrl && (
+                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                  No preview available.
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -823,33 +1164,34 @@ function StatsCard({
     red: "from-red-500 to-red-600",
   };
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3.5 sm:p-4">
       <div className="flex items-center justify-between">
         <div
-          className={`p-2 rounded-lg bg-gradient-to-r ${colorClasses[color]} text-white`}
+          className={`p-1.5 rounded-lg bg-gradient-to-r ${colorClasses[color]} text-white`}
         >
           {icon}
         </div>
         <div
-          className={`flex items-center space-x-1 text-sm ${
+          className={`flex items-center space-x-1 text-[11px] sm:text-xs ${
             trend === "up" ? "text-green-600" : "text-red-600"
           }`}
         >
           {trend === "up" ? (
-            <TrendingUp className="h-4 w-4" />
+            <TrendingUp className="h-3.5 w-3.5" />
           ) : (
-            <TrendingDown className="h-4 w-4" />
+            <TrendingDown className="h-3.5 w-3.5" />
           )}
           <span>{change}</span>
         </div>
       </div>
-      <div className="mt-4">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        <p className="text-2xl font-bold mt-1">{value}</p>
+      <div className="mt-2.5">
+        <p className="text-xs font-medium text-muted-foreground">{title}</p>
+        <p className="text-lg sm:text-xl font-bold mt-0.5">{value}</p>
       </div>
     </div>
   );
 }
+
 function ChartCard({
   title,
   description,
@@ -860,33 +1202,51 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-3.5 sm:p-4">
+      <div className="mb-2.5">
+        <h3 className="text-sm sm:text-base font-semibold">{title}</h3>
+        <p className="text-xs text-muted-foreground">{description}</p>
       </div>
       {children}
     </div>
   );
 }
+
 function TableHeader({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+    <th className="px-4 sm:px-5 py-2 text-left text-[11px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
       {children}
     </th>
   );
 }
 function TableCell({ children }: { children: React.ReactNode }) {
-  return <td className="px-6 py-4 whitespace-nowrap">{children}</td>;
+  return (
+    <td className="px-4 sm:px-5 py-2.5 whitespace-nowrap text-xs sm:text-sm">
+      {children}
+    </td>
+  );
 }
 
-function RiskBadge({ hallucinationRate, toxicityRate }: { hallucinationRate: number; toxicityRate: number }) {
+function RiskBadge({
+  hallucinationRate,
+  toxicityRate,
+}: {
+  hallucinationRate: number;
+  toxicityRate: number;
+}) {
   const score = 0.7 * hallucinationRate + 0.3 * toxicityRate;
   const label = score > 0.15 ? "High" : score > 0.07 ? "Medium" : "Low";
   const cls =
-    label === "High" ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" :
-    label === "Medium" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
-    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
-  return <span className={`px-2.5 py-1 rounded-md text-xs font-medium ${cls}`}>Risk: {label}</span>;
+    label === "High"
+      ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
+      : label === "Medium"
+      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
+  return (
+    <span
+      className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium ${cls}`}
+    >
+      Risk: {label}
+    </span>
+  );
 }
-

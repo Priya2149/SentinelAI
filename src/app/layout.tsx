@@ -35,20 +35,22 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <div className="flex-1 flex flex-col min-w-0">
               <Topbar />
               
-              {/* Page content */}
-              <main className="flex-1 relative">
-                {/* Content background */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-slate-50/40 dark:from-slate-900/40 dark:via-slate-800/20 dark:to-slate-900/40" />
-                
-                {/* Scrollable content */}
-                <div className="relative z-10 h-full overflow-auto">
-                  <div className="min-h-full p-4 md:p-6 lg:p-8">
-                    <div className="mx-auto max-w-7xl">
-                      {children}
-                    </div>
-                  </div>
-                </div>
-              </main>
+{/* Page content */}
+<main className="flex-1 relative">
+  {/* Content background */}
+  <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-white/20 to-slate-50/40 dark:from-slate-900/40 dark:via-slate-800/20 dark:to-slate-900/40" />
+
+  {/* Let the whole page scroll, not an inner div */}
+  <div className="relative z-10">
+    <div className="min-h-screen p-4 md:p-6 lg:p-8">
+      <div className="mx-auto max-w-7xl">
+        {children}
+      </div>
+    </div>
+  </div>
+</main>
+
+
             </div>
           </div>
         </Providers>

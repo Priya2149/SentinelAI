@@ -143,7 +143,7 @@ export default function Sidebar() {
     <aside
       aria-label="Sidebar"
       className="
-        hidden md:flex shrink-0 h-screen relative
+        hidden md:flex shrink-0 min-h-screen relative
         bg-gradient-to-b from-slate-50/80 via-white/50 to-slate-50/80 
         dark:from-slate-900/80 dark:via-slate-800/50 dark:to-slate-900/80
         backdrop-blur-xl supports-[backdrop-filter]:bg-white/10
