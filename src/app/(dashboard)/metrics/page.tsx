@@ -146,10 +146,6 @@ function mockSummary(daily: DailyMetric[]): SummaryData {
 /* ------------------------- Component ------------------------- */
 export default function MetricsPage() {
 
-   const pathname = usePathname();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
   const [dailyData, setDailyData] = useState<DailyMetric[]>([]);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,12 +156,6 @@ export default function MetricsPage() {
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 const [previewLoading, setPreviewLoading] = useState(false);
-
-  // keep modal state in sync with ?preview=1 in the URL
-  useEffect(() => {
-    const isOpen = searchParams.get("preview") === "1";
-    setShowPdfPreview(isOpen);
-  }, [searchParams]);
 
 useEffect(() => {
   if (typeof window === "undefined") return;
