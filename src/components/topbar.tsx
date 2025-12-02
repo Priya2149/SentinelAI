@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import NotificationsBell from "./NotificationsBell";
 import { SidebarMobile } from "./sidebar";
+import { FeedbackModal } from "./FeedbackModal";
 
 /** If you have next-auth, you can wire real user info here.
  *  For now, this is a simple hook with optional overrides. */
@@ -48,6 +49,9 @@ export function Topbar() {
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
+   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const FEEDBACK_FORM_URL =
+    "https://docs.google.com/forms/d/e/1FAIpQLSekxYrjOMkZhLxzX0l9XRt3MCLsmHkjdau5SCEwA1opVBllzA/viewform?usp=header";
 
   useEffect(() => setMounted(true), []);
   const isDark = theme === "dark";
@@ -167,9 +171,25 @@ export function Topbar() {
                 </div>
               )}
             </div>
+
+              {/* Feedback */}
+  <button
+    type="button"
+    onClick={() => setFeedbackOpen(true)}
+    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-700 px-3 py-1.5 text-xs font-medium bg-white/70 dark:bg-slate-900/70 hover:bg-white dark:hover:bg-slate-800 transition-colors"
+  >
+    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+    <span>Give Feedback</span>
+  </button>
           </div>
         </div>
       </header>
+          {/* Feedback modal */}
+      <FeedbackModal
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        formUrl={FEEDBACK_FORM_URL}
+      />
 
       <SidebarMobile open={mobileOpen} onClose={() => setMobileOpen(false)} />
     </>
