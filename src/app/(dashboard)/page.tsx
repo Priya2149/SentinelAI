@@ -100,7 +100,7 @@ export default async function Page({
               Overview
             </h1>
             <p className="text-xs sm:text-sm text-white/85 max-w-xl">
-              Real-time LLM monitoring with cost, latency & security tracking
+              Simulated LLM monitoring with cost, latency, and basic safety signal tracking.
             </p>
           </div>
           <div className="hidden sm:flex items-center gap-1.5">
@@ -144,8 +144,7 @@ export default async function Page({
                 AI usage, cost, latency, and errors using realistic demo data.
               </li>
               <li>
-                Open the Logs page to inspect individual LLM calls as they would
-                appear in a real deployment.
+               Open the Logs page to inspect how LLM calls would appear in a real deployment.
               </li>
               <li>
                 Visit{" "}
@@ -156,8 +155,8 @@ export default async function Page({
                 >
                   Connect
                 </a>{" "}
-                Docs to see how a production app would POST events to
-                `/api/logs/ingest`.
+                Docs to see a conceptual example of how applications could POST events to
+                `/api/logs/ingest`in a full version of SentinelAI.
               </li>
             </ol>
           </div>

@@ -229,8 +229,7 @@ export default async function AnalyticsPage() {
             Advanced Analytics
           </h1>
           <p className="text-muted-foreground mt-2">
-            Deep insights into model performance, cost trends, and user behavior
-            using demo traffic.
+            Explore simulated analytics that illustrate how SentinelAI would track model performance, cost trends, and usage patterns.
           </p>
         </div>
 

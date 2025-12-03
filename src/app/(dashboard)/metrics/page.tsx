@@ -450,7 +450,7 @@ export default function MetricsPage() {
                 />
               </div>
               <p className="text-muted-foreground mt-1 text-sm max-w-md">
-                Real-time insights into your AI system performance
+                Explore simulated insights that illustrate how SentinelAI would track AI system performance in real time.
               </p>
             </div>
 

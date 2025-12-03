@@ -199,7 +199,7 @@ export default async function LogsPage({
             API Call Logs
           </h1>
           <p className="text-muted-foreground mt-2">
-            Logs every LLM call, tracks cost, latency, tokens, hallucination flags — with real-time monitoring.
+            View simulated LLM call logs with cost, latency, tokens, and safety signals — illustrating how real-time monitoring would work in a full integration.
           </p>
         </div>
 

@@ -234,9 +234,8 @@ export default function PlaygroundPage() {
                 Test & Monitor AI Models
               </h1>
               <p className="mt-1.5 text-xs sm:text-sm text-white/90 max-w-2xl">
-                Send prompts, inspect responses, and preview how SentinelAI
-                would monitor real model calls. This Playground runs in demo
-                mode; providers and models are for illustration only.
+                Send prompts, view simulated responses, and preview how SentinelAI would monitor real model calls in a full integration.
+This Playground runs entirely in demo mode — providers, models, and outputs are illustrative only.
               </p>
             </div>
             <div className="flex gap-3">
