@@ -148,7 +148,7 @@ export default function NotificationsBell() {
           )}
 
           <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 text-right text-xs">
-            <Link href="/(dashboard)/logs" className="underline underline-offset-2">
+            <Link href="/logs" className="underline underline-offset-2">
               View all logs →
             </Link>
           </div>

@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "eslint",
     "kb:ingest": "ts-node --compiler-options '{\"module\":\"CommonJS\"}' scripts/ingest-kb.ts",
-    "seed": "prisma db seed"
+    "seed": "prisma db seed",
+    "seed:notifs": "ts-node prisma/seedNotifications.ts"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"

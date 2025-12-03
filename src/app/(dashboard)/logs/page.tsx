@@ -53,6 +53,7 @@ type SearchParamsShape = {
   range?: RangeKey;
   auto?: "on" | "off";
   page?: string;
+  id?: string; // 👈 added so we can read /logs?id=...
 };
 
 export type LogRow = {
@@ -96,6 +97,8 @@ export default async function LogsPage({
 
   const range: RangeKey = (resolved?.range as RangeKey) ?? "24h";
   const page = Number(resolved?.page ?? "1");
+
+  const selectedId = (resolved?.id ?? "").trim() || undefined; // 👈 notification target row
 
   const pageSize = 10;
   const skip = (page - 1) * pageSize;
@@ -253,6 +256,7 @@ export default async function LogsPage({
         pageSize={pageSize}
         totalCount={totalCount}
         lastUpdated={lastUpdated}
+        selectedId={selectedId} // 👈 pass through
       />
     </div>
   );
@@ -268,6 +272,7 @@ function FullTableUI({
   totalPages,
   totalCount,
   lastUpdated,
+  selectedId,
 }: {
   rows: LogRow[];
   currentPage: number;
@@ -275,6 +280,7 @@ function FullTableUI({
   pageSize: number;
   totalCount: number;
   lastUpdated: Date;
+  selectedId?: string;
 }) {
   function pageHref(p: number) {
     const sp = new URLSearchParams();
@@ -283,20 +289,23 @@ function FullTableUI({
   }
 
   return (
-    <div className="
+    <div
+      className="
       bg-white dark:bg-gray-900 
       rounded-xl shadow-sm 
       border border-gray-200 dark:border-gray-800 
-      overflow-hidden">
-
+      overflow-hidden"
+    >
       {/* Live Feed Header */}
-      <div className="
+      <div
+        className="
         px-6 py-4 
         border-b 
         bg-white dark:bg-gray-900
-        border-gray-200 dark:border-gray-800">
+        border-gray-200 dark:border-gray-800"
+      >
         <LiveFeedHeader
-          entriesLabel={`(${totalCount.toLocaleString()} entries)`}
+          entriesLabel={`(${totalCount.toLocaleString()} entries)`} 
           lastUpdated={lastUpdated}
         />
       </div>
@@ -315,9 +324,11 @@ function FullTableUI({
             <col style={{ width: "8%" }} />
           </colgroup>
 
-          <thead className="
+          <thead
+            className="
             bg-gray-50 dark:bg-gray-900 
-            border-b border-gray-200 dark:border-gray-800">
+            border-b border-gray-200 dark:border-gray-800"
+          >
             <tr>
               <TableHeaderCell title="Time" icon={<Clock className="h-4 w-4" />} />
               <TableHeaderCell title="User" icon={<User className="h-4 w-4" />} />
@@ -334,11 +345,13 @@ function FullTableUI({
             {rows.map((row) => (
               <tr
                 key={row.id}
-                className="
-                  border-b border-gray-200 dark:border-gray-800 
-                  hover:bg-gray-100 dark:hover:bg-gray-800/50
-                  transition">
-                
+                className={[
+                  "border-b border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800/50 transition",
+                  row.id === selectedId
+                    ? "bg-blue-50 dark:bg-blue-900/40 ring-1 ring-blue-300"
+                    : "",
+                ].join(" ")}
+              >
                 {/* TIME */}
                 <td className="px-4 py-5">
                   <div className="font-medium text-sm text-gray-900 dark:text-gray-200">
@@ -356,21 +369,20 @@ function FullTableUI({
 
                 {/* MODEL */}
                 <td className="px-4 py-5">
-<span
-  className="
-    inline-flex items-center 
-    px-3 py-1 
-    rounded-full 
-    bg-gray-100 text-gray-900
-    border border-gray-300
-    dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200
-    text-xs font-medium
-    whitespace-nowrap
-  "
->
-  {row.model}
-</span>
-
+                  <span
+                    className="
+                      inline-flex items-center 
+                      px-3 py-1 
+                      rounded-full 
+                      bg-gray-100 text-gray-900
+                      border border-gray-300
+                      dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200
+                      text-xs font-medium
+                      whitespace-nowrap
+                    "
+                  >
+                    {row.model}
+                  </span>
                 </td>
 
                 {/* LATENCY */}
@@ -408,13 +420,14 @@ function FullTableUI({
       </div>
 
       {/* PAGINATION */}
-      <div className="
+      <div
+        className="
         p-4 
         border-t 
         bg-white dark:bg-gray-900 
         border-gray-200 dark:border-gray-800 
-        flex items-center justify-between">
-        
+        flex items-center justify-between"
+      >
         <span className="text-sm text-gray-600 dark:text-gray-400">
           Page {currentPage} of {totalPages}
         </span>
@@ -427,7 +440,8 @@ function FullTableUI({
               border rounded 
               text-gray-700 dark:text-gray-300 
               border-gray-300 dark:border-gray-700 
-              hover:bg-gray-100 dark:hover:bg-gray-800 text-sm">
+              hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+          >
             Previous
           </a>
           <a
@@ -437,7 +451,8 @@ function FullTableUI({
               border rounded 
               text-gray-700 dark:text-gray-300 
               border-gray-300 dark:border-gray-700 
-              hover:bg-gray-100 dark:hover:bg-gray-800 text-sm">
+              hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+          >
             Next
           </a>
         </div>
@@ -452,8 +467,10 @@ function FullTableUI({
 
 function TableHeaderCell({ title, icon }: { title: string; icon?: React.ReactNode }) {
   return (
-    <th className="px-4 py-4 text-left text-xs font-semibold uppercase 
-                   text-gray-500 dark:text-gray-400">
+    <th
+      className="px-4 py-4 text-left text-xs font-semibold uppercase 
+                   text-gray-500 dark:text-gray-400"
+    >
       <div className="flex items-center gap-2">
         {icon}
         {title}
@@ -468,10 +485,12 @@ function UserCell({ email }: { email: string }) {
 
   return (
     <div className="flex items-center gap-3 min-w-0">
-      <div className="
+      <div
+        className="
         h-9 w-9 flex-shrink-0 rounded-full 
         bg-gradient-to-br from-purple-500 to-purple-600 
-        grid place-items-center text-white text-sm font-semibold shadow-md">
+        grid place-items-center text-white text-sm font-semibold shadow-md"
+      >
         {email === "—" ? "U" : email[0].toUpperCase()}
       </div>
       <div className="min-w-0 flex-1">
@@ -596,7 +615,9 @@ function QuickStat({
         </div>
         <div>
           <p className="text-sm text-gray-500 dark:text-gray-400">{label}</p>
-          <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{value}</p>
+          <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            {value}
+          </p>
         </div>
       </div>
     </div>

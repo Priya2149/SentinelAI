@@ -215,8 +215,7 @@ export default function LogsClient({
     a.click();
     URL.revokeObjectURL(url);
   }, [initialRows]);
-
-  const toggleStatus = (value: StatusKey) => {
+const toggleStatus = (value: StatusKey) => {
   // compute new list based on current state
   const next = status.includes(value)
     ? status.filter((s) => s !== value)
