@@ -11,10 +11,10 @@ type VendorStats = {
   models: number;
 };
 
-export default function VendorComparisonSection({ 
-  vendors 
-}: { 
-  vendors: VendorStats[] 
+export default function VendorComparisonSection({
+  vendors,
+}: {
+  vendors: VendorStats[];
 }) {
   return <VendorComparisonCard vendors={vendors} />;
 }

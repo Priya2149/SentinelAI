@@ -1,11 +1,8 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
-
-import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
-
 import {
   Clock,
   User,
@@ -16,38 +13,29 @@ import {
   XCircle,
   Flag,
 } from "lucide-react";
-
-import LogsClient, {
-  RowActions,
-  type RangeKey,
-  type StatusKey,
-  type LogRow,
-} from "./LogsClient";
+import LogsClient, { RowActions } from "./LogsClient";
 import LiveFeedHeader from "./LiveFeedHeader";
 
-function formatDate(d: Date | string): string {
-  return new Date(d).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+type RangeKey = "24h" | "3d" | "7d" | "all";
+export type StatusKey = "SUCCESS" | "FAIL" | "FLAGGED";
+
+function formatDate(d: Date | string) {
+  return new Date(d).toLocaleString();
 }
 
-function formatRelativeTime(d: Date | string): string {
+function formatRelativeTime(d: Date | string) {
   const now = new Date();
   const date = new Date(d);
-  const diffSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diffSeconds < 60) return `${diffSeconds}s ago`;
-  if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m ago`;
-  if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h ago`;
-  return `${Math.floor(diffSeconds / 86400)}d ago`;
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function toNumberOrUndefined(v?: string): number | undefined {
-  if (!v?.trim()) return undefined;
+function toNum(v?: string) {
+  if (!v) return undefined;
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
 }
@@ -62,70 +50,68 @@ type SearchParamsShape = {
   minCost?: string;
   maxCost?: string;
   range?: RangeKey;
+  auto?: "on" | "off";
   page?: string;
 };
 
-type ModelCallWithUser = Prisma.ModelCallGetPayload<{ include: { user: true } }>;
-
-function buildQueryString(
-  searchParams: SearchParamsShape | undefined,
-  page: number,
-): string {
-  const params = new URLSearchParams();
-
-  if (searchParams?.q) params.set("q", searchParams.q);
-  if (searchParams?.status) params.set("status", searchParams.status);
-  if (searchParams?.model) params.set("model", searchParams.model);
-  if (searchParams?.user) params.set("user", searchParams.user);
-  if (searchParams?.minLatency) params.set("minLatency", searchParams.minLatency);
-  if (searchParams?.maxLatency) params.set("maxLatency", searchParams.maxLatency);
-  if (searchParams?.minCost) params.set("minCost", searchParams.minCost);
-  if (searchParams?.maxCost) params.set("maxCost", searchParams.maxCost);
-  if (searchParams?.range) params.set("range", searchParams.range);
-
-  if (page > 1) params.set("page", String(page));
-  else params.delete("page");
-
-  const qs = params.toString();
-  return qs ? `?${qs}` : "";
-}
+export type LogRow = {
+  id: string;
+  at: Date;
+  user: string;
+  model: string;
+  latency: number;
+  tokens: number;
+  cost: number;
+  status: StatusKey | string;
+  promptTokens: number;
+  respTokens: number;
+  input?: unknown;
+  output?: unknown;
+  meta?: unknown;
+};
 
 export default async function LogsPage({
   searchParams,
 }: {
-  searchParams?: SearchParamsShape;
-}) {
-  const q = (searchParams?.q ?? "").trim();
+  searchParams: Promise<SearchParamsShape>;
+}) 
+{
+   const resolved = await searchParams;
+  const q = (resolved?.q ?? "").trim();
 
-  const statusList: StatusKey[] =
-    (searchParams?.status ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter((s): s is StatusKey =>
-        ["SUCCESS", "FAIL", "FLAGGED"].includes(s),
-      ) ?? [];
+  const statusList: StatusKey[] = (resolved?.status ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(
+      (x): x is StatusKey => x === "SUCCESS" || x === "FAIL" || x === "FLAGGED"
+    );
 
-  const model = (searchParams?.model ?? "").trim();
-  const userEmail = (searchParams?.user ?? "").trim();
-  const minLatency = toNumberOrUndefined(searchParams?.minLatency);
-  const maxLatency = toNumberOrUndefined(searchParams?.maxLatency);
-  const minCost = toNumberOrUndefined(searchParams?.minCost);
-  const maxCost = toNumberOrUndefined(searchParams?.maxCost);
-  const range: RangeKey = (searchParams?.range as RangeKey) ?? "24h";
+  const model = (resolved?.model ?? "").trim();
+  const userEmail = (resolved?.user ?? "").trim();
 
-  const since: Date | undefined =
+  const minLatency = toNum(resolved?.minLatency);
+  const maxLatency = toNum(resolved?.maxLatency);
+  const minCost = toNum(resolved?.minCost);
+  const maxCost = toNum(resolved?.maxCost);
+
+  const range: RangeKey = (resolved?.range as RangeKey) ?? "24h";
+  const page = Number(resolved?.page ?? "1");
+
+  const pageSize = 10;
+  const skip = (page - 1) * pageSize;
+
+  const since =
     range === "24h"
-      ? new Date(Date.now() - 24 * 60 * 60 * 1000)
+      ? new Date(Date.now() - 86400000)
       : range === "3d"
-      ? new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+      ? new Date(Date.now() - 3 * 86400000)
       : range === "7d"
-      ? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      ? new Date(Date.now() - 7 * 86400000)
       : undefined;
-
   const where: Prisma.ModelCallWhereInput = {
     ...(since ? { createdAt: { gte: since } } : {}),
     ...(statusList.length ? { status: { in: statusList } } : {}),
-    ...(model ? { model: { equals: model } } : {}),
+
     ...(q
       ? {
           OR: [
@@ -135,15 +121,19 @@ export default async function LogsPage({
           ],
         }
       : {}),
+
+    ...(model ? { model } : {}),
     ...(userEmail
       ? { user: { email: { contains: userEmail, mode: "insensitive" } } }
       : {}),
+
     ...((minLatency !== undefined || maxLatency !== undefined) && {
       latencyMs: {
         ...(minLatency !== undefined ? { gte: minLatency } : {}),
         ...(maxLatency !== undefined ? { lte: maxLatency } : {}),
       },
     }),
+
     ...((minCost !== undefined || maxCost !== undefined) && {
       costUsd: {
         ...(minCost !== undefined ? { gte: minCost } : {}),
@@ -151,93 +141,66 @@ export default async function LogsPage({
       },
     }),
   };
-
-  const raw: ModelCallWithUser[] = await prisma.modelCall.findMany({
+  const totalCount = await prisma.modelCall.count({ where });
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const raw = await prisma.modelCall.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    take: 200,
+    skip,
+    take: pageSize,
     include: { user: true },
   });
-
-  const allRows: LogRow[] = raw.map((r) => {
+  const rows: LogRow[] = raw.map((r) => {
     const bag = r as unknown as Record<string, unknown>;
-    const input = (bag["input"] ?? bag["prompt"]) as unknown;
-    const output = (bag["output"] ?? bag["response"]) as unknown;
-    const meta = (bag["meta"] ?? bag["metadata"]) as unknown;
-
-    const promptTokens = Number(
-      (r as { promptTokens?: number | null }).promptTokens ?? 0,
-    );
-    const respTokens = Number(
-      (r as { respTokens?: number | null }).respTokens ?? 0,
-    );
-    const latency = Number(
-      (r as { latencyMs?: number | null }).latencyMs ?? 0,
-    );
-    const cost = Number((r as { costUsd?: number | null }).costUsd ?? 0);
 
     return {
       id: r.id,
       at: r.createdAt,
       user: r.user?.email ?? "—",
       model: r.model,
-      latency,
-      tokens: promptTokens + respTokens,
-      cost,
-      status: r.status as StatusKey | string,
-      promptTokens,
-      respTokens,
-      input,
-      output,
-      meta,
+      latency: Number(r.latencyMs ?? 0),
+      tokens: Number(r.promptTokens ?? 0) + Number(r.respTokens ?? 0),
+      cost: Number(r.costUsd ?? 0),
+      status: r.status as StatusKey,
+      promptTokens: Number(r.promptTokens ?? 0),
+      respTokens: Number(r.respTokens ?? 0),
+      input: bag["input"] ?? bag["prompt"],
+      output: bag["output"] ?? bag["response"],
+      meta: bag["meta"] ?? bag["metadata"],
     };
   });
 
-  const pageSize = 10;
-  const totalCalls = allRows.length;
-  const totalPages = Math.max(1, Math.ceil(totalCalls / pageSize));
+  const lastUpdated = rows[0]?.at ?? new Date();
+  const totalCalls = totalCount;
 
-  const rawPage = Number(searchParams?.page ?? "1");
-  let page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
-  if (page > totalPages) page = totalPages;
+  const sumCost = await prisma.modelCall.aggregate({
+    _sum: { costUsd: true },
+  });
 
-  const startIndex = (page - 1) * pageSize;
-  const rows = allRows.slice(startIndex, startIndex + pageSize);
+  const avgLatency = await prisma.modelCall.aggregate({
+    _avg: { latencyMs: true },
+  });
 
-  const totalCost = allRows.reduce((sum, r) => sum + r.cost, 0);
-  const avgLatency = Math.round(
-    totalCalls ? allRows.reduce((s, r) => s + r.latency, 0) / totalCalls : 0,
-  );
   const errorRate =
-    totalCalls === 0
-      ? 0
-      : (allRows.filter((r) => r.status !== "SUCCESS").length / totalCalls) *
-        100;
-
-  const lastUpdated = allRows[0]?.at ?? new Date();
-
-  const hasPrev = page > 1;
-  const hasNext = page < totalPages;
-
-  const entriesLabel =
-    range === "all"
-      ? `(${totalCalls} entries, all time)`
-      : `(${totalCalls} entries, last ${range})`;
-
+    totalCount > 0
+      ? (await prisma.modelCall.count({
+          where: { status: { not: "SUCCESS" } },
+        })) / totalCount
+      : 0;
   return (
-    <div className="space-y-4 px-4 pt-3 pb-4">
-      {/* Header + search/filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div className="space-y-6 p-6">
+      {/* ----------------------- HEADER ----------------------- */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">API Call Logs</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Logs every LLM call, tracks token cost & latency, and runs lightweight
-            safety checks — all visualized here with realistic demo traffic.
+          <h1 className="text-3xl font-bold tracking-tight">API Call Logs</h1>
+          <p className="text-muted-foreground mt-2">
+            Logs every LLM call, tracks cost, latency, tokens, hallucination
+            flags — with real-time monitoring.
           </p>
         </div>
 
         <LogsClient
-          initialRows={allRows}
+          initialRows={rows}
           lastUpdated={lastUpdated}
           defaults={{
             q,
@@ -253,212 +216,329 @@ export default async function LogsPage({
         />
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      {/* --------------------- STATS --------------------- */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <QuickStat
-          icon={<Zap className="h-4 w-4" />}
+          icon={<Zap className="h-5 w-5" />}
           label="Total Calls"
           value={totalCalls.toLocaleString()}
           color="blue"
         />
         <QuickStat
-          icon={<DollarSign className="h-4 w-4" />}
+          icon={<DollarSign className="h-5 w-5" />}
           label="Total Cost"
-          value={`$${totalCost.toFixed(4)}`}
+          value={`$${(sumCost._sum.costUsd ?? 0).toFixed(4)}`}
           color="green"
         />
         <QuickStat
-          icon={<Clock className="h-4 w-4" />}
+          icon={<Clock className="h-5 w-5" />}
           label="Avg Latency"
-          value={`${avgLatency}ms`}
+          value={`${Math.round(avgLatency._avg.latencyMs ?? 0)}ms`}
           color="purple"
         />
         <QuickStat
-          icon={<AlertTriangle className="h-4 w-4" />}
+          icon={<AlertTriangle className="h-5 w-5" />}
           label="Error Rate"
-          value={`${errorRate.toFixed(1)}%`}
-          color={errorRate > 10 ? "red" : "orange"}
+          value={`${(errorRate * 100).toFixed(1)}%`}
+          color={errorRate > 0.1 ? "red" : "orange"}
         />
       </div>
 
-      {/* Logs table */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border overflow-hidden">
-        {/* Live feed header with auto-refresh toggle */}
-        <div className="px-4 sm:px-6 py-3 border-b bg-gray-50 dark:bg-gray-800/50">
-          <LiveFeedHeader entriesLabel={entriesLabel} lastUpdated={lastUpdated} />
-        </div>
+      {/* --------------------- TABLE --------------------- */}
+      <FullTableUI
+        rows={rows}
+        totalPages={totalPages}
+        currentPage={page}
+        pageSize={pageSize}
+        totalCount={totalCount}
+        lastUpdated={lastUpdated}
+      />
+    </div>
+  );
+}
 
-        {/* Scrollable table body */}
-        <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr>
-                <TableHeader>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>Time</span>
+function FullTableUI({
+  rows,
+  currentPage,
+  totalPages,
+  totalCount,
+  lastUpdated,
+}: {
+  rows: LogRow[];
+  currentPage: number;
+  totalPages: number;
+  pageSize: number;
+  totalCount: number;
+  lastUpdated: Date;
+}) {
+  function pageHref(p: number) {
+    const sp = new URLSearchParams();
+    sp.set("page", String(p));
+    return `/logs?${sp.toString()}`;
+  }
+
+  return (
+    <div className="bg-gray-900 rounded-xl shadow-sm border border-gray-800 overflow-hidden">
+      {/* Live Feed Header */}
+      <div className="px-6 py-4 border-b border-gray-800 bg-gray-900">
+        <LiveFeedHeader
+          entriesLabel={`(${totalCount.toLocaleString()} entries)`}
+          lastUpdated={lastUpdated}
+        />
+      </div>
+
+      {/* TABLE */}
+      <div className="overflow-x-hidden">
+        <table className="w-full">
+          <colgroup>
+            <col style={{ width: "14%" }} />
+            <col style={{ width: "18%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "11%" }} />
+            <col style={{ width: "11%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "8%" }} />
+          </colgroup>
+          <thead className="bg-gray-900 border-b border-gray-800">
+            <tr>
+              <TableHeaderCell
+                title="Time"
+                icon={<Clock className="h-4 w-4" />}
+              />
+              <TableHeaderCell
+                title="User"
+                icon={<User className="h-4 w-4" />}
+              />
+              <TableHeaderCell title="Model" />
+              <TableHeaderCell title="Latency" />
+              <TableHeaderCell title="Tokens" />
+              <TableHeaderCell title="Cost" />
+              <TableHeaderCell title="Status" />
+              <TableHeaderCell title="Actions" />
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map((row, i) => (
+              <tr
+                key={row.id}
+                className="border-b border-gray-800 hover:bg-gray-800/50 transition"
+              >
+                {/* TIME */}
+                <td className="px-4 py-5">
+                  <div className="font-medium text-sm text-gray-200">
+                    {formatDate(row.at)}
                   </div>
-                </TableHeader>
-                <TableHeader>
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    <span>User</span>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {formatRelativeTime(row.at)}
                   </div>
-                </TableHeader>
-                <TableHeader>Model</TableHeader>
-                <TableHeader>Latency</TableHeader>
-                <TableHeader>Tokens</TableHeader>
-                <TableHeader>Cost</TableHeader>
-                <TableHeader>Status</TableHeader>
-                <TableHeader>Actions</TableHeader>
+                </td>
+
+                {/* USER */}
+                <td className="px-4 py-5">
+                  <UserCell email={row.user} />
+                </td>
+
+                {/* MODEL */}
+                <td className="px-4 py-5">
+                  <span className="px-3 py-1.5 bg-gray-700 rounded-full text-xs font-medium text-gray-200 inline-block">
+                    {row.model}
+                  </span>
+                </td>
+
+                {/* LATENCY */}
+                <td className="px-4 py-5">
+                  <LatencyCell latency={row.latency} />
+                </td>
+
+                {/* TOKENS */}
+                <td className="px-4 py-5">
+                  <TokensCell
+                    total={row.tokens}
+                    prompt={row.promptTokens}
+                    resp={row.respTokens}
+                  />
+                </td>
+
+                {/* COST */}
+                <td className="px-4 py-5">
+                  <CostCell cost={row.cost} />
+                </td>
+
+                {/* STATUS */}
+                <td className="px-4 py-5">
+                  <StatusBadge status={row.status} />
+                </td>
+
+                {/* ACTIONS */}
+                <td className="px-4 py-5">
+                  <RowActions row={row} />
+                </td>
               </tr>
-            </thead>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-            <tbody className="divide-y">
-              {rows.map((row) => (
-                <tr key={row.id} className="hover:bg-gray-50">
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="font-mono text-xs">{formatDate(row.at)}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {formatRelativeTime(row.at)}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{row.user}</TableCell>
-                  <TableCell>{row.model}</TableCell>
-                  <TableCell>{row.latency}ms</TableCell>
-                  <TableCell>{row.tokens}</TableCell>
-                  <TableCell>${row.cost.toFixed(5)}</TableCell>
-                  <TableCell>
-                    <StatusBadgeEnhanced status={row.status} />
-                  </TableCell>
-                  <TableCell>
-                    <RowActions row={row} />
-                  </TableCell>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* PAGINATION */}
+      <div className="p-4 border-t border-gray-800 flex items-center justify-between bg-gray-900">
+        <span className="text-sm text-gray-400">
+          Page {currentPage} of {totalPages}
+        </span>
 
-        {/* Pagination footer */}
-        <div className="flex items-center justify-between px-4 py-2 border-t bg-gray-50">
-          <div className="text-xs text-muted-foreground">
-            Showing{" "}
-            {totalCalls === 0 ? 0 : startIndex + 1}–
-            {startIndex + rows.length} of {totalCalls}
-          </div>
-          <div className="flex items-center gap-2">
-            {hasPrev ? (
-              <a
-                href={buildQueryString(searchParams, page - 1)}
-                className="px-3 py-1 text-xs border rounded hover:bg-gray-100"
-              >
-                Previous
-              </a>
-            ) : (
-              <button
-                className="px-3 py-1 text-xs border rounded opacity-50"
-                disabled
-              >
-                Previous
-              </button>
-            )}
-            {hasNext ? (
-              <a
-                href={buildQueryString(searchParams, page + 1)}
-                className="px-3 py-1 text-xs border rounded hover:bg-gray-100"
-              >
-                Next
-              </a>
-            ) : (
-              <button
-                className="px-3 py-1 text-xs border rounded opacity-50"
-                disabled
-              >
-                Next
-              </button>
-            )}
-          </div>
+        <div className="flex gap-2">
+          <a
+            href={pageHref(Math.max(1, currentPage - 1))}
+            className="px-3 py-1 border border-gray-700 rounded hover:bg-gray-800 text-gray-300 text-sm"
+          >
+            Previous
+          </a>
+          <a
+            href={pageHref(Math.min(totalPages, currentPage + 1))}
+            className="px-3 py-1 border border-gray-700 rounded hover:bg-gray-800 text-gray-300 text-sm"
+          >
+            Next
+          </a>
         </div>
       </div>
     </div>
   );
 }
 
-/* ---------- helper components (no `any`) ---------- */
+/* =============================================================
+   UI COMPONENTS
+   ============================================================= */
 
-function TableHeader({ children }: { children: ReactNode }) {
+function TableHeaderCell({
+  title,
+  icon,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+}) {
   return (
-    <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase text-gray-500">
-      {children}
+    <th className="px-4 py-4 text-left text-xs font-semibold uppercase text-gray-400">
+      <div className="flex items-center gap-2">
+        {icon}
+        {title}
+      </div>
     </th>
   );
 }
 
-function TableCell({ children }: { children: ReactNode }) {
-  return <td className="px-4 py-2 text-xs">{children}</td>;
+function UserCell({ email }: { email: string }) {
+  const name = email === "—" ? "Anonymous" : email.split("@")[0];
+  const domain = email === "—" ? "Guest User" : email.split("@")[1];
+
+  return (
+    <div className="flex items-center gap-3 min-w-0">
+      <div className="h-9 w-9 flex-shrink-0 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 grid place-items-center text-white text-sm font-semibold shadow-md">
+        {email === "—" ? "U" : email[0].toUpperCase()}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="font-medium text-sm text-gray-200 truncate">{name}</div>
+        <div className="text-xs text-gray-500 truncate">{domain}</div>
+      </div>
+    </div>
+  );
 }
 
-type StatusConfig = {
-  icon: ReactNode;
-  classes: string;
-  pulse: boolean;
-};
+function LatencyCell({ latency }: { latency: number }) {
+  const isFast = latency < 500;
+  const color = isFast ? "bg-green-500" : "bg-yellow-500";
+  const label = isFast ? "Fast" : "Normal";
+  const width = Math.min((latency / 2000) * 100, 100) + "%";
 
-function StatusBadgeEnhanced({ status }: { status: string | StatusKey }) {
-  const base: StatusConfig = {
-    icon: <AlertTriangle className="h-3 w-3" />,
-    classes:
-      "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600",
-    pulse: false,
-  };
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden flex-shrink-0">
+          <div className={`h-full ${color}`} style={{ width }} />
+        </div>
+        <div className="text-sm font-semibold text-yellow-400 whitespace-nowrap">
+          {latency}ms
+        </div>
+      </div>
+      <div className="text-xs text-gray-500">{label}</div>
+    </div>
+  );
+}
 
-  const map: Partial<Record<string, StatusConfig>> = {
-    SUCCESS: {
-      icon: <CheckCircle2 className="h-3 w-3" />,
-      classes:
-        "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800",
-      pulse: false,
-    },
-    FAIL: {
-      icon: <XCircle className="h-3 w-3" />,
-      classes:
-        "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800",
-      pulse: true,
-    },
-    FLAGGED: {
-      icon: <Flag className="h-3 w-3" />,
-      classes:
-        "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800",
-      pulse: true,
-    },
-  };
+function TokensCell({
+  total,
+  prompt,
+  resp,
+}: {
+  total: number;
+  prompt: number;
+  resp: number;
+}) {
+  return (
+    <div>
+      <div className="font-semibold text-base text-gray-200">
+        {total.toLocaleString()}
+      </div>
+      <div className="flex gap-1 text-xs text-gray-500 mt-0.5">
+        <span>{prompt}↑</span>
+        <span>{resp}↓</span>
+      </div>
+    </div>
+  );
+}
 
-  const cfg = map[status] ?? base;
+function CostCell({ cost }: { cost: number }) {
+  return (
+    <div>
+      <div className="font-semibold text-base text-green-400">
+        ${cost.toFixed(5)}
+      </div>
+      <div className="text-xs text-gray-500 mt-0.5">
+        {(cost * 1000).toFixed(2)}/1K
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cfg =
+    status === "SUCCESS"
+      ? {
+          icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+          cls: "bg-green-500/10 text-green-400 border-green-500/20",
+        }
+      : status === "FAIL"
+      ? {
+          icon: <XCircle className="h-3.5 w-3.5" />,
+          cls: "bg-red-500/10 text-red-400 border-red-500/20",
+        }
+      : {
+          icon: <Flag className="h-3.5 w-3.5" />,
+          cls: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+        };
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${cfg.classes} ${
-        cfg.pulse ? "animate-pulse" : ""
-      }`}
+      className={`px-2.5 py-1.5 rounded-full text-xs font-medium border inline-flex gap-1.5 items-center ${cfg.cls}`}
     >
       {cfg.icon}
-      <span>{status}</span>
+      {status}
     </span>
   );
 }
 
-type QuickStatProps = {
-  icon: ReactNode;
+function QuickStat({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
   label: string;
   value: string;
   color: "blue" | "green" | "purple" | "orange" | "red";
-};
-
-function QuickStat({ icon, label, value, color }: QuickStatProps) {
-  const colorClasses: Record<QuickStatProps["color"], string> = {
+}) {
+  const colorMap = {
     blue: "from-blue-500 to-blue-600",
     green: "from-green-500 to-green-600",
     purple: "from-purple-500 to-purple-600",
@@ -467,16 +547,16 @@ function QuickStat({ icon, label, value, color }: QuickStatProps) {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border p-3">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border p-4">
       <div className="flex items-center gap-3">
         <div
-          className={`p-2 rounded-lg bg-gradient-to-r ${colorClasses[color]} text-white`}
+          className={`p-2 rounded-lg bg-gradient-to-r ${colorMap[color]} text-white`}
         >
           {icon}
         </div>
         <div>
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-base font-bold">{value}</p>
+          <p className="text-sm text-muted-foreground">{label}</p>
+          <p className="text-lg font-bold">{value}</p>
         </div>
       </div>
     </div>

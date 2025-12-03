@@ -4,6 +4,7 @@ import {
   useCallback,
   useMemo,
   useState,
+  useEffect,
   type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -18,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
 
 export type RangeKey = "24h" | "3d" | "7d" | "all";
 export type StatusKey = "SUCCESS" | "FAIL" | "FLAGGED";
@@ -73,6 +75,16 @@ type Overrides = Partial<
 
 function csvEscape(cell: string): string {
   return /[",\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
+}
+
+function formatRelativeTime(d: Date | string): string {
+  const now = new Date();
+  const date = new Date(d);
+  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 export default function LogsClient({
@@ -205,232 +217,268 @@ export default function LogsClient({
   }, [initialRows]);
 
   const toggleStatus = (value: StatusKey) => {
-    setStatus((prev) =>
-      prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value],
-    );
-  };
+  // compute new list based on current state
+  const next = status.includes(value)
+    ? status.filter((s) => s !== value)
+    : [...status, value];
 
-  const lastUpdatedLabel = useMemo(
-    () => new Date(lastUpdated).toLocaleString(),
-    [lastUpdated],
-  );
+  // update local state for the pills
+  setStatus(next);
+
+  // push to URL so server sees it
+  apply({
+    status: next.length ? next.join(",") : undefined, // if empty, remove param
+  });
+};
+
+  // const lastUpdatedLabel = useMemo(
+  //   () => formatRelativeTime(lastUpdated),
+  //   [lastUpdated],
+  // );
 
   return (
-    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center">
-      {/* Search */}
-      <form
-        onSubmit={handleSearchSubmit}
-        className="flex items-center gap-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full px-3 py-1.5 shadow-sm w-full sm:w-[320px]"
-      >
-        <SearchIcon className="h-4 w-4 text-gray-400" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search id, model, user..."
-          className="flex-1 bg-transparent text-xs focus:outline-none"
-        />
-        {q && (
+    <>
+
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center">
+        {/* Search */}
+        <form
+          onSubmit={handleSearchSubmit}
+          className="flex items-center gap-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full px-3 py-1.5 shadow-sm w-full sm:w-[320px]"
+        >
+          <SearchIcon className="h-4 w-4 text-gray-400" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search id, model, user..."
+            className="flex-1 bg-transparent text-xs focus:outline-none"
+          />
+          {q && (
+            <button
+              type="button"
+              onClick={() => {
+                setQ("");
+                apply({ q: "" });
+              }}
+              className="p-1 rounded-full text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </form>
+
+        {/* Filters + Export */}
+        <div className="flex items-center gap-2 justify-end flex-1">
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-gray-50">
+                <Filter className="h-3.5 w-3.5" />
+                Filters
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-[420px] text-xs space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                {/* Status */}
+                <div>
+                  <div className="text-[11px] font-semibold uppercase text-gray-500">
+                    Status
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {(["SUCCESS", "FAIL", "FLAGGED"] as StatusKey[]).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => toggleStatus(s)}
+                        className={`rounded-full border px-2.5 py-1 text-[11px] ${
+                          status.includes(s)
+                            ? "bg-blue-600 border-blue-600 text-white"
+                            : "border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Model */}
+                <div>
+                  <div className="text-[11px] font-semibold uppercase text-gray-500">
+                    Model
+                  </div>
+                  <select
+                    className="mt-1 w-full rounded-lg border px-2.5 py-1.5 bg-background"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                  >
+                    <option value="">All</option>
+                    {models.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* User */}
+                <div>
+                  <div className="text-[11px] font-semibold uppercase text-gray-500">
+                    User (email)
+                  </div>
+                  <input
+                    className="mt-1 w-full rounded-lg border px-2.5 py-1.5 bg-background"
+                    placeholder="contains..."
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                  />
+                </div>
+
+                {/* Time range */}
+                <div>
+                  <div className="text-[11px] font-semibold uppercase text-gray-500">
+                    Time range
+                  </div>
+                  <select
+                    className="mt-1 w-full rounded-lg border px-2.5 py-1.5 bg-background"
+                    value={range}
+                    onChange={(e) => setRange(e.target.value as RangeKey)}
+                  >
+                    <option value="24h">Last 24h</option>
+                    <option value="3d">Last 3 days</option>
+                    <option value="7d">Last 7 days</option>
+                    <option value="all">All time</option>
+                  </select>
+                </div>
+
+                {/* Latency */}
+                <div>
+                  <div className="text-[11px] font-semibold uppercase text-gray-500">
+                    Latency (ms)
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      className="w-full rounded-lg border px-2 py-1.5 bg-background"
+                      placeholder="min"
+                      value={minLatency}
+                      onChange={(e) => setMinLatency(e.target.value)}
+                      inputMode="numeric"
+                    />
+                    <span className="text-[11px] text-muted-foreground">to</span>
+                    <input
+                      className="w-full rounded-lg border px-2 py-1.5 bg-background"
+                      placeholder="max"
+                      value={maxLatency}
+                      onChange={(e) => setMaxLatency(e.target.value)}
+                      inputMode="numeric"
+                    />
+                  </div>
+                </div>
+
+                {/* Cost */}
+                <div>
+                  <div className="text-[11px] font-semibold uppercase text-gray-500">
+                    Cost (USD)
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <input
+                      className="w-full rounded-lg border px-2 py-1.5 bg-background"
+                      placeholder="min"
+                      value={minCost}
+                      onChange={(e) => setMinCost(e.target.value)}
+                      inputMode="decimal"
+                    />
+                    <span className="text-[11px] text-muted-foreground">to</span>
+                    <input
+                      className="w-full rounded-lg border px-2 py-1.5 bg-background"
+                      placeholder="max"
+                      value={maxCost}
+                      onChange={(e) => setMaxCost(e.target.value)}
+                      inputMode="decimal"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Popover footer */}
+              <div className="flex items-center justify-end pt-1 border-t mt-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
+                    onClick={() => {
+                      setQ("");
+                      setStatus([]);
+                      setModel("");
+                      setUserEmail("");
+                      setMinLatency("");
+                      setMaxLatency("");
+                      setMinCost("");
+                      setMaxCost("");
+                      setRange("24h");
+                      apply({
+                        q: "",
+                        status: undefined,
+                        model: "",
+                        user: "",
+                        minLatency: "",
+                        maxLatency: "",
+                        minCost: "",
+                        maxCost: "",
+                        range: "24h",
+                      });
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                    onClick={() => apply()}
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Export */}
           <button
             type="button"
-            onClick={() => {
-              setQ("");
-              apply({ q: "" });
-            }}
-            className="p-1 rounded-full text-gray-400 hover:text-gray-600"
+            onClick={exportCsv}
+            className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 text-white px-3.5 py-1.5 text-xs font-medium shadow-sm hover:bg-blue-700"
           >
-            <X className="h-3 w-3" />
+            <Download className="h-3.5 w-3.5" />
+            Export
           </button>
-        )}
-      </form>
-
-      {/* Filters + Export */}
-      <div className="flex items-center gap-2 justify-end flex-1">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium shadow-sm hover:bg-gray-50">
-              <Filter className="h-3.5 w-3.5" />
-              Filters
-            </button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-[420px] text-xs space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              {/* Status */}
-              <div>
-                <div className="text-[11px] font-semibold uppercase text-gray-500">
-                  Status
-                </div>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {(["SUCCESS", "FAIL", "FLAGGED"] as StatusKey[]).map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => toggleStatus(s)}
-                      className={`rounded-full border px-2.5 py-1 text-[11px] ${
-                        status.includes(s)
-                          ? "bg-blue-600 border-blue-600 text-white"
-                          : "border-gray-200 hover:bg-gray-50"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Model */}
-              <div>
-                <div className="text-[11px] font-semibold uppercase text-gray-500">
-                  Model
-                </div>
-                <select
-                  className="mt-1 w-full rounded-lg border px-2.5 py-1.5 bg-background"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                >
-                  <option value="">All</option>
-                  {models.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* User */}
-              <div>
-                <div className="text-[11px] font-semibold uppercase text-gray-500">
-                  User (email)
-                </div>
-                <input
-                  className="mt-1 w-full rounded-lg border px-2.5 py-1.5 bg-background"
-                  placeholder="contains..."
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                />
-              </div>
-
-              {/* Time range */}
-              <div>
-                <div className="text-[11px] font-semibold uppercase text-gray-500">
-                  Time range
-                </div>
-                <select
-                  className="mt-1 w-full rounded-lg border px-2.5 py-1.5 bg-background"
-                  value={range}
-                  onChange={(e) => setRange(e.target.value as RangeKey)}
-                >
-                  <option value="24h">Last 24h</option>
-                  <option value="3d">Last 3 days</option>
-                  <option value="7d">Last 7 days</option>
-                  <option value="all">All time</option>
-                </select>
-              </div>
-
-              {/* Latency */}
-              <div>
-                <div className="text-[11px] font-semibold uppercase text-gray-500">
-                  Latency (ms)
-                </div>
-                <div className="mt-1 flex items-center gap-2">
-                  <input
-                    className="w-full rounded-lg border px-2 py-1.5 bg-background"
-                    placeholder="min"
-                    value={minLatency}
-                    onChange={(e) => setMinLatency(e.target.value)}
-                    inputMode="numeric"
-                  />
-                  <span className="text-[11px] text-muted-foreground">to</span>
-                  <input
-                    className="w-full rounded-lg border px-2 py-1.5 bg-background"
-                    placeholder="max"
-                    value={maxLatency}
-                    onChange={(e) => setMaxLatency(e.target.value)}
-                    inputMode="numeric"
-                  />
-                </div>
-              </div>
-
-              {/* Cost */}
-              <div>
-                <div className="text-[11px] font-semibold uppercase text-gray-500">
-                  Cost (USD)
-                </div>
-                <div className="mt-1 flex items-center gap-2">
-                  <input
-                    className="w-full rounded-lg border px-2 py-1.5 bg-background"
-                    placeholder="min"
-                    value={minCost}
-                    onChange={(e) => setMinCost(e.target.value)}
-                    inputMode="decimal"
-                  />
-                  <span className="text-[11px] text-muted-foreground">to</span>
-                  <input
-                    className="w-full rounded-lg border px-2 py-1.5 bg-background"
-                    placeholder="max"
-                    value={maxCost}
-                    onChange={(e) => setMaxCost(e.target.value)}
-                    inputMode="decimal"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Popover footer */}
-            <div className="flex items-center justify-between pt-1 border-t mt-2">
-              <span className="text-[11px] text-muted-foreground">
-                Last updated: {lastUpdatedLabel}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50 dark:hover:bg-gray-800"
-                  onClick={() => {
-                    setQ("");
-                    setStatus([]);
-                    setModel("");
-                    setUserEmail("");
-                    setMinLatency("");
-                    setMaxLatency("");
-                    setMinCost("");
-                    setMaxCost("");
-                    setRange("24h");
-                    apply({
-                      q: "",
-                      status: undefined,
-                      model: "",
-                      user: "",
-                      minLatency: "",
-                      maxLatency: "",
-                      minCost: "",
-                      maxCost: "",
-                      range: "24h",
-                    });
-                  }}
-                >
-                  Clear
-                </button>
-                <button
-                  type="button"
-                  className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-                  onClick={() => apply()}
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        {/* Export */}
-        <button
-          type="button"
-          onClick={exportCsv}
-          className="inline-flex items-center gap-1.5 rounded-full bg-blue-600 text-white px-3.5 py-1.5 text-xs font-medium shadow-sm hover:bg-blue-700"
-        >
-          <Download className="h-3.5 w-3.5" />
-          Export
-        </button>
+        </div>
       </div>
+    </>
+  );
+}
+
+/* ---------- Auto Refresh Header Component ---------- */
+export function AutoRefreshHeader({ 
+  autoRefresh, 
+  setAutoRefresh,
+  lastUpdated 
+}: { 
+  autoRefresh: boolean; 
+  setAutoRefresh: (value: boolean) => void;
+  lastUpdated: string;
+}) {
+  return (
+    <div className="flex items-center gap-4 text-sm text-gray-400" id="auto-refresh-header">
+      <div className="flex items-center gap-2">
+        <span>Auto-refresh:</span>
+        <Switch
+          checked={autoRefresh}
+          onCheckedChange={setAutoRefresh}
+          className="data-[state=checked]:bg-blue-600"
+        />
+        <span className="font-medium">{autoRefresh ? 'ON' : 'OFF'}</span>
+      </div>
+      <span className="text-gray-600">•</span>
+      <span>Last updated: {lastUpdated}</span>
     </div>
   );
 }

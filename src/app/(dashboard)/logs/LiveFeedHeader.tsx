@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Switch } from "@/components/ui/switch";
 
 type LiveFeedHeaderProps = {
-  entriesLabel: string;            // e.g. "(68 entries, last 24h)"
+  entriesLabel: string;
   lastUpdated: Date | string;
 };
 
@@ -25,26 +25,51 @@ export default function LiveFeedHeader({
 }: LiveFeedHeaderProps) {
   const router = useRouter();
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [lastUpdatedLabel, setLastUpdatedLabel] = useState(
+    formatRelativeTime(lastUpdated)
+  );
 
-  // poll the page when auto-refresh is ON
+  // Load initial value from localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("logs:autoRefresh");
+    if (stored === "1") {
+      setAutoRefresh(true);
+    }
+  }, []);
+
+  //Persist whenever it changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("logs:autoRefresh", autoRefresh ? "1" : "0");
+  }, [autoRefresh]);
+
+  //Auto-refresh behaviour
   useEffect(() => {
     if (!autoRefresh) return;
+
     const id = setInterval(() => {
-      router.refresh();
-    }, 10000); // 10s
+      const ts = Date.now();
+      router.replace(`/logs?page=1&ts=${ts}`);
+    }, 5000);
+
     return () => clearInterval(id);
   }, [autoRefresh, router]);
 
-  const lastUpdatedLabel = useMemo(
-    () => formatRelativeTime(lastUpdated),
-    [lastUpdated]
-  );
+  //Keep "Last updated" label fresh
+  useEffect(() => {
+    setLastUpdatedLabel(formatRelativeTime(lastUpdated));
+    const id = setInterval(() => {
+      setLastUpdatedLabel(formatRelativeTime(lastUpdated));
+    }, 1000 * 30);
+    return () => clearInterval(id);
+  }, [lastUpdated]);
 
   return (
-    <div className="flex items-center justify-between text-xs">
+    <div className="flex items-center justify-between text-xs text-gray-300">
       <div className="flex items-center gap-2">
         <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
-        <span className="text-sm font-medium">Live Feed</span>
+        <span className="text-sm font-medium text-gray-100">Live Feed</span>
         <span className="text-muted-foreground">{entriesLabel}</span>
       </div>
 

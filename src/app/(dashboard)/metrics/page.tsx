@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
 import {
   LineChart,
   Line,
@@ -31,7 +30,6 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 /* ----------------------------- Types ----------------------------- */
 interface DailyMetric {
@@ -145,7 +143,6 @@ function mockSummary(daily: DailyMetric[]): SummaryData {
 
 /* ------------------------- Component ------------------------- */
 export default function MetricsPage() {
-
   const [dailyData, setDailyData] = useState<DailyMetric[]>([]);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -155,78 +152,71 @@ export default function MetricsPage() {
   const [downloading, setDownloading] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
-useEffect(() => {
-  if (typeof window === "undefined") return;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  const handlePopState = () => {
-    // If preview is open, close it instead of leaving the page
-    if (showPdfPreview) {
+    const handlePopState = () => {
+      if (showPdfPreview) {
+        setShowPdfPreview(false);
+        setPreviewLoading(false);
+        setPreviewUrl((url) => {
+          if (url) URL.revokeObjectURL(url);
+          return null;
+        });
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [showPdfPreview, setShowPdfPreview, setPreviewLoading, setPreviewUrl]);
+
+  async function openPdfPreview() {
+    try {
+      if (typeof window !== "undefined") {
+        window.history.pushState(
+          { pdfPreview: true },
+          "",
+          window.location.href
+        );
+      }
+      setPreviewLoading(true);
+      setShowPdfPreview(true);
+
+      const [{ pdf }, { default: ComplianceReport }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("@/components/pdf/ComplianceReport"),
+      ]);
+
+      const doc = <ComplianceReport data={pdfData} />;
+      const blob = await pdf(doc).toBlob();
+      const url = URL.createObjectURL(blob);
+
+      setPreviewUrl((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return url;
+      });
+    } catch (err) {
+      console.error("PDF preview failed:", err);
+      alert("Could not generate the preview. Check the console for details.");
       setShowPdfPreview(false);
+    } finally {
       setPreviewLoading(false);
+    }
+  }
+
+  function closePdfPreview() {
+    if (typeof window !== "undefined") {
+      window.history.back();
+    } else {
+      setShowPdfPreview(false);
       setPreviewUrl((url) => {
         if (url) URL.revokeObjectURL(url);
         return null;
       });
     }
-  };
-
-  window.addEventListener("popstate", handlePopState);
-  return () => window.removeEventListener("popstate", handlePopState);
-}, [showPdfPreview, setShowPdfPreview, setPreviewLoading, setPreviewUrl]);
-
-
-
-async function openPdfPreview() {
-  try {
-
-       if (typeof window !== "undefined") {
-      // Push a new history state so Back can close the modal
-      window.history.pushState(
-        { pdfPreview: true },
-        "",
-        window.location.href
-      );
-    }
-    setPreviewLoading(true);
-    setShowPdfPreview(true);
-
-    const [{ pdf }, { default: ComplianceReport }] = await Promise.all([
-      import("@react-pdf/renderer"),
-      import("@/components/pdf/ComplianceReport"),
-    ]);
-
-    const doc = <ComplianceReport data={pdfData} />;
-    const blob = await pdf(doc).toBlob();
-    const url = URL.createObjectURL(blob);
-
-    setPreviewUrl((old) => {
-      if (old) URL.revokeObjectURL(old);
-      return url;
-    });
-  } catch (err) {
-    console.error("PDF preview failed:", err);
-    alert("Could not generate the preview. Check the console for details.");
-    setShowPdfPreview(false);
-  } finally {
-    setPreviewLoading(false);
   }
-}
-
-function closePdfPreview() {
-
-    if (typeof window !== "undefined") {
-    // Go back to the previous history entry (same page, no modal)
-    window.history.back();
-  } else {
-  setShowPdfPreview(false);
-  setPreviewUrl((url) => {
-    if (url) URL.revokeObjectURL(url);
-    return null;
-  });
-}
-}
 
   async function fetchData() {
     setLoading(true);
@@ -236,9 +226,9 @@ function closePdfPreview() {
     start.setDate(start.getDate() - (timeRange === "7d" ? 7 : 30));
     const daysCount = timeRange === "7d" ? 7 : 30;
 
-    const dailyUrl = `/api/metrics/daily?from=${start
-      .toISOString()
-      .split("T")[0]}&to=${end.toISOString().split("T")[0]}`;
+    const dailyUrl = `/api/metrics/daily?from=${
+      start.toISOString().split("T")[0]
+    }&to=${end.toISOString().split("T")[0]}`;
     const summaryUrl = `/api/metrics/summary`;
 
     try {
@@ -297,12 +287,12 @@ function closePdfPreview() {
   const avgLatency =
     dailyData.length > 0
       ? Math.round(
-          dailyData.reduce((s, d) => s + d.avgLatencyMs, 0) /
-            dailyData.length
+          dailyData.reduce((s, d) => s + d.avgLatencyMs, 0) / dailyData.length
         )
       : 0;
   const totalErrors = dailyData.reduce((s, d) => s + d.errors, 0);
-  const overallErrorRate = totalCalls > 0 ? (totalErrors / totalCalls) * 100 : 0;
+  const overallErrorRate =
+    totalCalls > 0 ? (totalErrors / totalCalls) * 100 : 0;
 
   const pieData: PieDataItem[] = summaryData?.statuses
     ? [
@@ -425,19 +415,17 @@ function closePdfPreview() {
     active && payload && payload.length ? (
       <div className={tooltipContainerClass}>
         <p className="text-sm font-semibold">
-          {payload[0]?.name}:{" "}
-          {Number(payload[0]?.value ?? 0).toLocaleString()}
+          {payload[0]?.name}: {Number(payload[0]?.value ?? 0).toLocaleString()}
         </p>
       </div>
     ) : null;
 
-const now = new Date();
-const year = now.getFullYear();
-const month = String(now.getMonth() + 1).padStart(2, "0");
-const day = String(now.getDate()).padStart(2, "0");
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
 
-const fileName = `AI_Governance_Report_${year}-${month}-${day}.pdf`;
-
+  const fileName = `AI_Governance_Report_${year}-${month}-${day}.pdf`;
 
   /* ----------------------------- JSX ----------------------------- */
   return (

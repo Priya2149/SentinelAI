@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
-
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { ensureAlwaysFreshData } from "@/lib/seedDemoDataAggressive"; // ← ADD THIS
+import { ensureAlwaysFreshData } from "@/lib/seedDemoDataAggressive";
 import {
   Activity,
   CheckCircle2,
@@ -20,15 +19,15 @@ import {
   Sparkles,
 } from "lucide-react";
 
-/** ----- status typing (no 'any') ----- */
 const STATUS_VALUES = ["SUCCESS", "FAIL", "FLAGGED"] as const;
 type Status = (typeof STATUS_VALUES)[number];
 
 function asStatus(s: unknown): Status {
-  return STATUS_VALUES.includes(String(s) as Status) ? (s as Status) : "FLAGGED";
+  return STATUS_VALUES.includes(String(s) as Status)
+    ? (s as Status)
+    : "FLAGGED";
 }
 
-/** ----- time range handling ----- */
 const RANGE_MS: Record<string, number> = {
   "24h": 24 * 60 * 60 * 1000,
   "3d": 3 * 24 * 60 * 60 * 1000,
@@ -43,7 +42,6 @@ export default async function Page({
 }: {
   searchParams?: { range?: string; ts?: string; page?: string };
 }) {
-  // ✨ ENSURE FRESH DEMO DATA FOR PORTFOLIO
   await ensureAlwaysFreshData();
 
   const rangeParam = (searchParams?.range as RangeKey) || "24h";
@@ -53,7 +51,6 @@ export default async function Page({
   const rawPage = Number(searchParams?.page ?? "1");
   let page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
 
-  // helper to load counts for a given range
   async function loadCounts(range: RangeKey) {
     const since = new Date(Date.now() - RANGE_MS[range]);
     const counts = await prisma.modelCall.groupBy({
@@ -65,13 +62,11 @@ export default async function Page({
     return { range, since, counts, total };
   }
 
-  // load counts for requested range, fallback to 3d if 24h is empty
   let { range, since, counts, total } = await loadCounts(requestedRange);
   if (range === "24h" && total === 0) {
     ({ range, since, counts, total } = await loadCounts("3d"));
   }
 
-  // clamp page to available data
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   if (page > totalPages) page = totalPages;
 
@@ -89,13 +84,10 @@ export default async function Page({
   const fail = counts.find((c) => c.status === "FAIL")?._count.status ?? 0;
   const flagged =
     counts.find((c) => c.status === "FLAGGED")?._count.status ?? 0;
-
-  // keep the same range when refreshing, reset to first page
   const refreshHref = `?range=${range}&page=1&ts=${Date.now()}`;
 
   return (
     <div className="p-0 sm:p-4 relative isolate min-h-full">
-      {/* ===== HERO (ultra compact) ===== */}
       <div className="relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white">
         <div className="absolute inset-0 opacity-30 mix-blend-overlay pointer-events-none [background:radial-gradient(60%_50%_at_10%_10%,white,transparent_60%),radial-gradient(40%_40%_at_90%_20%,white,transparent_60%)]" />
         <div className="relative px-4 py-4 sm:px-5 sm:py-5 flex items-center justify-between gap-4">
@@ -111,8 +103,6 @@ export default async function Page({
               Real-time LLM monitoring with cost, latency & security tracking
             </p>
           </div>
-
-          {/* Toolbar */}
           <div className="hidden sm:flex items-center gap-1.5">
             <ToolbarChip
               href={`?range=24h&page=1`}
@@ -142,12 +132,12 @@ export default async function Page({
           </div>
         </div>
       </div>
-
-      {/* Getting Started (ultra compact) */}
       <section className="mt-3 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex-1 min-w-0">
-            <div className="text-[10px] font-semibold mb-1.5 text-muted-foreground uppercase tracking-wide">Getting Started</div>
+            <div className="text-[10px] font-semibold mb-1.5 text-muted-foreground uppercase tracking-wide">
+              Getting Started
+            </div>
             <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-0.5">
               <li>
                 Explore the charts and tables below to see how SentinelAI tracks
@@ -188,7 +178,6 @@ export default async function Page({
         </div>
       </section>
 
-      {/* ===== KPIs (compact horizontal layout) ===== */}
       <section className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Link href={`/logs?range=${range}`} className="block group">
           <GlassKpi
@@ -221,9 +210,7 @@ export default async function Page({
         />
       </section>
 
-      {/* ===== MAIN LAYOUT (table wider, no inner scrollbars) ===== */}
       <div className="mt-3 grid grid-cols-1 xl:grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)] gap-3">
-        {/* LEFT: Activity Table */}
         <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           <header className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800">
             <div className="flex items-center gap-2.5">
@@ -362,8 +349,6 @@ export default async function Page({
             skip={skip}
           />
         </section>
-
-        {/* RIGHT: Quick Insights */}
         <section className="space-y-4">
           <InsightCard
             title="Reliability"
@@ -439,7 +424,9 @@ function GlassKpi({
     <div className="relative rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm hover:shadow-md transition-shadow h-[116px] flex flex-col justify-between">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
-          <div className="text-xs font-medium text-muted-foreground mb-2">{label}</div>
+          <div className="text-xs font-medium text-muted-foreground mb-2">
+            {label}
+          </div>
           <div className="text-3xl font-bold tracking-tight">
             {value.toLocaleString()}
           </div>
@@ -612,7 +599,10 @@ function Pagination({
           : `Showing ${start}–${end} of ${total} results`}
       </p>
       <div className="flex items-center gap-2">
-        <PageLink href={page > 1 ? makeHref(page - 1) : undefined} disabled={page <= 1}>
+        <PageLink
+          href={page > 1 ? makeHref(page - 1) : undefined}
+          disabled={page <= 1}
+        >
           Previous
         </PageLink>
         <PageLink
