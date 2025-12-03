@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 type LiveFeedHeaderProps = {
   entriesLabel: string;
   lastUpdated: Date | string;
+  
 };
 
 function formatRelativeTime(d: Date | string): string {
@@ -28,6 +29,25 @@ export default function LiveFeedHeader({
   const [lastUpdatedLabel, setLastUpdatedLabel] = useState(
     formatRelativeTime(lastUpdated)
   );
+
+  // AUTO REFRESH — preserves all filters while forcing page=1 + fresh timestamp
+useEffect(() => {
+  if (!autoRefresh) return;
+
+  const id = setInterval(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    // Always show newest logs
+    params.set("page", "1");
+
+    // Break cache
+    params.set("ts", Date.now().toString());
+
+    router.replace(`/logs?${params.toString()}`);
+  }, 5000);
+
+  return () => clearInterval(id);
+}, [autoRefresh, router]);
 
   // Load initial value from localStorage
   useEffect(() => {
@@ -69,8 +89,14 @@ export default function LiveFeedHeader({
     <div className="flex items-center justify-between text-xs text-gray-300">
       <div className="flex items-center gap-2">
         <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse" />
-        <span className="text-sm font-medium text-gray-100">Live Feed</span>
-        <span className="text-muted-foreground">{entriesLabel}</span>
+        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+  Live Feed
+</span>
+
+       <span className="text-gray-700 dark:text-gray-400 whitespace-nowrap ml-1">
+  {entriesLabel}
+</span>
+
       </div>
 
       <div className="flex items-center gap-3 text-muted-foreground">
@@ -82,7 +108,7 @@ export default function LiveFeedHeader({
             className="scale-75 origin-right"
           />
         </div>
-        <div className="h-1 w-1 bg-gray-400 rounded-full" />
+        <div className="h-1 w-1 bg-gray-400 rounded-full"/>
         <span>Last updated: {lastUpdatedLabel}</span>
       </div>
     </div>
