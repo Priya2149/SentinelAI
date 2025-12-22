@@ -1,63 +1,51 @@
-#AI Governance Dashboard
+# SentinelAI — AI Governance Dashboard
 
-> **Modern full-stack monitoring tool for Large Language Models (LLMs).**  
-> Built to showcase **AI observability, governance, and compliance readiness**
+SentinelAI is a full-stack AI governance + observability dashboard for monitoring and evaluating LLM interactions. It tracks usage, latency, and cost signals, runs lightweight safety/eval checks, and generates compliance-style reports — all in a SaaS-style UI.
 
-## Overview
+> Note: This project currently uses **synthetic/mock data** for dashboards and demos (no customer production data).
 
-This project is a **production-style AI governance dashboard** that tracks, evaluates, and reports on LLM activity.  
-It solves the problems enterprises face when deploying AI at scale:
+## Live Demo
+- Vercel: **<https://sentinelai-app.vercel.app/>**
 
-- **Hallucinations & unsafe outputs**
-- **Uncontrolled costs** 
-- **No visibility** 
-- **Compliance pressure**
+## Why I Built This
+As LLM-based features become common, it gets hard to answer basic questions:
+- Which models are being used the most?
+- What is latency and cost over time?
+- Which prompts/responses may be risky (prompt injection, PII, toxicity, hallucinations)?
+- Can we generate compliance-style summaries quickly?
 
-**Built with a 2025-ready stack:**  
-Next.js 15 · Tailwind 4.0 · ShadCN UI · TypeScript · PostgreSQL/Supabase
+SentinelAI is my personal project to practice building an end-to-end product with production-style structure: database + APIs + UI + reporting.
+
 ---
 
-## Core Features
+## Key Features
 
-### 1. Model Call Logging & Metrics
-- Tracks every AI call: prompt (sanitized), response length, latency, status
-- Dashboard table + charts for latency & error rate
+### Monitoring & Observability
+- **LLM call logging** (model, tokens, latency, cost, errors)
+- **Analytics dashboards** for usage, cost trends, latency performance, and error breakdowns
+- **Real-time-style monitoring** via auto-refresh and a production-style dashboard layout :contentReference[oaicite:2]{index=2}
 
-### 2. Hallucination & Guardrail Checks
-- Compares model outputs vs. expected demo answers
-- Flags hallucinations and unsafe/toxic content via free moderation model
+### AI Safety & Lightweight Evals
+- Evaluation pipeline designed to support checks such as:
+  - Prompt injection detection
+  - PII/secrets detection
+  - Toxicity detection
+  - Hallucination / grounding checks (gold/expected-answer comparisons) :contentReference[oaicite:3]{index=3}
 
-### 3. Cost Estimation
-- Approximates token usage → calculates cost per user/month
-- Visualized as bar graphs in the dashboard
+### Reports
+- **One-click PDF report generation** for compliance-style documentation (KPI summaries + trends + governance signals) :contentReference[oaicite:4]{index=4}
 
-### 4. Compliance Report (PDF Export)
-- One-click PDF summary with:
-  - Total calls
-  - Avg latency
-  - % hallucinations flagged
-  - Estimated monthly cost
-  - EU AI Act risk label (static for demo)
-
-### 5. Modern Dashboard UI
-- Built with **Next.js 15 + Tailwind 4.0**
-- Dark mode + responsive charts
-- Pages: **Logs | Metrics | Reports**
+### Product Experience
+- Modern dashboard UI with clear navigation and data visualization
+- Logs, analytics, metrics, and reporting views (SaaS-style workflow) :contentReference[oaicite:5]{index=5}
 
 ---
 
 ## Tech Stack
-
-**Frontend:**  
-- Next.js 15, TypeScript, Tailwind 
-- Chart.js / Recharts for graphs  
-
-**Backend:**  
-- Next.js  
-- SQLite (local) or Supabase PostgreSQL (free tier) 
-
-**AI / Eval Tools:**  
-- Free HuggingFace moderation model  
-- Simple evals pipeline for hallucination checks  
+- **Frontend:** Next.js, React, TypeScript, Tailwind CSS
+- **Backend:** Next.js API routes / Node.js + TypeScript REST APIs
+- **Database:** PostgreSQL (via ORM such as Prisma, if configured)
+- **Charts / Visualization:** Recharts (or equivalent charting library)
+- **Deployment:** Vercel :contentReference[oaicite:6]{index=6}
 
 ---
