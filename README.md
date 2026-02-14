@@ -23,21 +23,21 @@ SentinelAI is my personal project to practice building an end-to-end product wit
 ### Monitoring & Observability
 - **LLM call logging** (model, tokens, latency, cost, errors)
 - **Analytics dashboards** for usage, cost trends, latency performance, and error breakdowns
-- **Real-time-style monitoring** via auto-refresh and a production-style dashboard layout :contentReference[oaicite:2]{index=2}
+- **Real-time-style monitoring** via auto-refresh and a production-style dashboard layout
 
 ### AI Safety & Lightweight Evals
 - Evaluation pipeline designed to support checks such as:
   - Prompt injection detection
   - PII/secrets detection
   - Toxicity detection
-  - Hallucination / grounding checks (gold/expected-answer comparisons) :contentReference[oaicite:3]{index=3}
+  - Hallucination / grounding checks (gold/expected-answer comparisons)
 
 ### Reports
-- **One-click PDF report generation** for compliance-style documentation (KPI summaries + trends + governance signals) :contentReference[oaicite:4]{index=4}
+- **One-click PDF report generation** for compliance-style documentation (KPI summaries + trends + governance signals)
 
 ### Product Experience
 - Modern dashboard UI with clear navigation and data visualization
-- Logs, analytics, metrics, and reporting views (SaaS-style workflow) :contentReference[oaicite:5]{index=5}
+- Logs, analytics, metrics, and reporting views
 
 ---
 
