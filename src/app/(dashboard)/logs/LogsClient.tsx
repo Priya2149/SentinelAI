@@ -21,24 +21,12 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 
-export type RangeKey = "24h" | "3d" | "7d" | "all";
-export type StatusKey = "SUCCESS" | "FAIL" | "FLAGGED";
-
-export type LogRow = {
-  id: string;
-  at: Date | string;
-  user: string;
-  model: string;
-  latency: number;
-  tokens: number;
-  cost: number;
-  status: StatusKey | string;
-  promptTokens: number;
-  respTokens: number;
-  input?: unknown;
-  output?: unknown;
-  meta?: unknown;
-};
+import type {
+  LogRow,
+  LogsFilterOptions,
+  RangeKey,
+  StatusKey,
+} from "@/server/logs/logs.types";
 
 type ControlsDefaults = {
   q: string;
@@ -54,7 +42,7 @@ type ControlsDefaults = {
 
 type LogsClientProps = {
   initialRows: LogRow[];
-  lastUpdated: Date | string;
+  filterOptions: LogsFilterOptions;
   defaults: ControlsDefaults;
 };
 
@@ -88,8 +76,8 @@ function formatRelativeTime(d: Date | string): string {
 }
 
 export default function LogsClient({
-  initialRows,
-  lastUpdated,
+ initialRows,
+  filterOptions,
   defaults,
 }: LogsClientProps) {
   const router = useRouter();
@@ -114,12 +102,15 @@ export default function LogsClient({
   );
   const [range, setRange] = useState<RangeKey>(defaults.range);
 
-  const models = useMemo(() => {
-    const s = new Set<string>();
-    initialRows.forEach((r) => s.add(r.model));
-    return Array.from(s).sort();
-  }, [initialRows]);
+const models = useMemo(
+  () => Array.from(new Set(filterOptions.models)).sort(),
+  [filterOptions.models]
+);
 
+const users = useMemo(
+  () => Array.from(new Set(filterOptions.users)).sort(),
+  [filterOptions.users]
+);
   const apply = useCallback(
     (overrides?: Overrides) => {
       const next = new URLSearchParams(searchParams?.toString() ?? "");
@@ -237,7 +228,6 @@ const toggleStatus = (value: StatusKey) => {
 
   return (
     <>
-
       <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-stretch sm:items-center">
         {/* Search */}
         <form
@@ -282,20 +272,22 @@ const toggleStatus = (value: StatusKey) => {
                     Status
                   </div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {(["SUCCESS", "FAIL", "FLAGGED"] as StatusKey[]).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => toggleStatus(s)}
-                        className={`rounded-full border px-2.5 py-1 text-[11px] ${
-                          status.includes(s)
-                            ? "bg-blue-600 border-blue-600 text-white"
-                            : "border-gray-200 hover:bg-gray-50"
-                        }`}
-                      >
-                        {s}
-                      </button>
-                    ))}
+                    {(["SUCCESS", "FAIL", "FLAGGED"] as StatusKey[]).map(
+                      (s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => toggleStatus(s)}
+                          className={`rounded-full border px-2.5 py-1 text-[11px] ${
+                            status.includes(s)
+                              ? "bg-blue-600 border-blue-600 text-white"
+                              : "border-gray-200 hover:bg-gray-50"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ),
+                    )}
                   </div>
                 </div>
 
@@ -328,7 +320,14 @@ const toggleStatus = (value: StatusKey) => {
                     placeholder="contains..."
                     value={userEmail}
                     onChange={(e) => setUserEmail(e.target.value)}
+                    list="logs-user-options"
                   />
+
+                  <datalist id="logs-user-options">
+                    {users.map((user) => (
+                      <option key={user} value={user} />
+                    ))}
+                  </datalist>
                 </div>
 
                 {/* Time range */}
@@ -361,7 +360,9 @@ const toggleStatus = (value: StatusKey) => {
                       onChange={(e) => setMinLatency(e.target.value)}
                       inputMode="numeric"
                     />
-                    <span className="text-[11px] text-muted-foreground">to</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      to
+                    </span>
                     <input
                       className="w-full rounded-lg border px-2 py-1.5 bg-background"
                       placeholder="max"
@@ -385,7 +386,9 @@ const toggleStatus = (value: StatusKey) => {
                       onChange={(e) => setMinCost(e.target.value)}
                       inputMode="decimal"
                     />
-                    <span className="text-[11px] text-muted-foreground">to</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      to
+                    </span>
                     <input
                       className="w-full rounded-lg border px-2 py-1.5 bg-background"
                       placeholder="max"

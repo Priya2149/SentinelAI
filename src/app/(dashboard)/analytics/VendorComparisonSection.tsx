@@ -1,15 +1,7 @@
 "use client";
 
 import VendorComparisonCard from "@/components/analytics/VendorComparisonCard";
-
-type VendorStats = {
-  provider: string;
-  calls: number;
-  avgLatencyMs: number;
-  totalCostUsd: number;
-  avgCostPerCall: number;
-  models: number;
-};
+import type { VendorStats } from "@/server/analytics/analytics.types";
 
 export default function VendorComparisonSection({
   vendors,

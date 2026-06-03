@@ -3,10 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider          = "postgresql"
-  url               = env("DATABASE_URL")
-  directUrl         = env("DIRECT_URL")
-  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  provider = "postgresql"
 }
 
 model User {
@@ -29,10 +26,17 @@ model ModelCall {
   promptTokens  Int
   respTokens    Int
   costUsd       Float          @default(0)
-  status        CallStatus     @default(SUCCESS) // SUCCESS | FAIL | FLAGGED
+  status        CallStatus     @default(SUCCESS)
   hallucinated  Boolean        @default(false)
   toxic         Boolean        @default(false)
   evals         EvalResult[]
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([model, createdAt])
+  @@index([userId, createdAt])
+  @@index([latencyMs])
+  @@index([costUsd])
 }
 
 model EvalResult {

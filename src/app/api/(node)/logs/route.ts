@@ -1,35 +1,36 @@
-import { NextResponse } from "next/server";
-
-
+import { NextRequest, NextResponse } from "next/server";
+import { getLogsPageData } from "@/server/logs/logs.service";
+import type { LogsSearchParams } from "@/server/logs/logs.types";
 
 export const runtime = "nodejs";
-export const revalidate = 0; 
-
+export const revalidate = 0;
 export const dynamic = "force-dynamic";
-
-
 export const maxDuration = 20;
 
-export async function GET(req: Request) {
-  const { prisma } = await import("@/lib/prisma");
+export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const takeParam = searchParams.get("take");
-    const skipParam = searchParams.get("skip");
+    const params = Object.fromEntries(
+      req.nextUrl.searchParams.entries()
+    ) as LogsSearchParams;
 
-    const take = Math.min(Number.isFinite(+takeParam!) ? parseInt(takeParam!, 10) : 50, 200);
-    const skip = Number.isFinite(+skipParam!) ? parseInt(skipParam!, 10) : 0;
+    const data = await getLogsPageData(params);
 
-    const rows = await prisma.modelCall.findMany({
-      skip,
-      take,
-      orderBy: { createdAt: "desc" },
-      include: { user: true },
+    return NextResponse.json({
+      items: data.rows,
+      pagination: data.pagination,
+      stats: data.stats,
+      lastUpdated: data.lastUpdated,
     });
+  } catch (error) {
+    console.error("GET /api/logs failed:", error);
 
-    return NextResponse.json(rows);
-  } catch (err) {
-    console.error("/api/logs GET failed:", err);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "Failed to load logs",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
