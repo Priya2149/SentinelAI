@@ -64,9 +64,12 @@ export type ComplianceReportData = {
   hallucinationRate: number;
   failures: number;
   euAiActRisk: string;
-  successCount: number;
-  flaggedCount: number;
-  toxicityRate: number;
-  daily: DailyMetric[];
-  window?: string;
+  successCount?: number;
+  flaggedCount?: number;
+  toxicityRate?: number;
+  daily?: DailyMetric[];
+  window?: {
+    from?: string;
+    to?: string;
+  };
 };

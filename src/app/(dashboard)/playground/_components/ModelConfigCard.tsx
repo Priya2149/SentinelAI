@@ -6,7 +6,7 @@ import {
   Loader2,
   Rocket,
   Shield,
-  TerminalSquare,
+  SquareTerminal,
 } from "lucide-react";
 import type { Provider } from "@/types/playground";
 
@@ -161,7 +161,7 @@ export function ModelConfigCard({
           </div>
 
           <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/40 px-4 py-3 rounded-xl text-xs">
-            <TerminalSquare className="h-4 w-4 text-orange-500" />
+            <SquareTerminal className="h-4 w-4 text-orange-500" />
             Token cost calculation
           </div>
         </div>

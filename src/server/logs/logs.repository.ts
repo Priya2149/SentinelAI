@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Prisma } from "@prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export async function findLogsPage({
@@ -67,8 +67,15 @@ export async function getLogsStats(where: Prisma.ModelCallWhereInput) {
   };
 }
 
+type LogsFilterOptionRow = {
+  model: string;
+  user: {
+    email: string;
+  } | null;
+};
+
 export async function getLogsFilterOptions() {
-  const rows = await prisma.modelCall.findMany({
+  const rows: LogsFilterOptionRow[] = await prisma.modelCall.findMany({
     orderBy: { createdAt: "desc" },
     take: 1000,
     select: {
@@ -82,11 +89,15 @@ export async function getLogsFilterOptions() {
   });
 
   const models = Array.from(new Set(rows.map((row) => row.model)))
-    .filter(Boolean)
+    .filter((model): model is string => Boolean(model))
     .sort();
 
   const users = Array.from(
-    new Set(rows.map((row) => row.user?.email).filter(Boolean) as string[])
+    new Set(
+      rows
+        .map((row) => row.user?.email)
+        .filter((email): email is string => Boolean(email))
+    )
   ).sort();
 
   return {

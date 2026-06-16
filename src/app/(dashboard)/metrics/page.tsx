@@ -1,12 +1,12 @@
 "use client";
 
+import { useMetrics } from "@/hooks/useMetrics";
 import { DailyBreakdownTable } from "./_components/DailyBreakdownTable";
 import { MetricsCharts } from "./_components/MetricsCharts";
 import { MetricsHeader } from "./_components/MetricsHeader";
 import { MetricsStatsGrid } from "./_components/MetricsStatsGrid";
-import { PdfPreviewModal } from "./_components/PdfPreviewModal";
+import { PdfPreviewModal } from "@/components/pdf/PdfPreviewModal";
 import { useComplianceReport } from "@/hooks/useComplianceReport";
-import { useMetrics } from "@/hooks/useMetrics";
 
 function MetricsInitialSkeleton() {
   return (

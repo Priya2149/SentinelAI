@@ -1,6 +1,6 @@
 import "server-only";
 
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { RealtimeSnapshot, SummaryData } from "./metrics.types";
 import { percentile } from "./metrics.utils";
@@ -13,13 +13,19 @@ type RawDailyMetric = {
   errors: bigint;
 };
 
+type RealtimeMetricRow = {
+  latencyMs: number | null;
+  status: string;
+  costUsd: number | null;
+};
+
 export async function getDailyMetricRows({
   start,
   end,
 }: {
   start: Date;
   end: Date;
-}) {
+}): Promise<RawDailyMetric[]> {
   return prisma.$queryRaw<RawDailyMetric[]>(Prisma.sql`
     SELECT date_trunc('day', "createdAt") AS day,
            COUNT(*) AS calls,
@@ -35,7 +41,14 @@ export async function getDailyMetricRows({
 }
 
 export async function getMetricsSummaryData(): Promise<SummaryData> {
-  const [total, latencyAgg, costAgg, byStatus, safetyRows] = await Promise.all([
+  const [
+    total,
+    latencyAgg,
+    costAgg,
+    successCount,
+    failCount,
+    flaggedCount,
+  ] = await Promise.all([
     prisma.modelCall.count(),
 
     prisma.modelCall.aggregate({
@@ -46,27 +59,18 @@ export async function getMetricsSummaryData(): Promise<SummaryData> {
       _avg: { costUsd: true },
     }),
 
-    prisma.modelCall.groupBy({
-      by: ["status"],
-      _count: { status: true },
+    prisma.modelCall.count({
+      where: { status: "SUCCESS" },
     }),
 
-    prisma.modelCall.findMany({
-      select: { status: true },
-      take: 100_000,
-      orderBy: { createdAt: "desc" },
+    prisma.modelCall.count({
+      where: { status: "FAIL" },
+    }),
+
+    prisma.modelCall.count({
+      where: { status: "FLAGGED" },
     }),
   ]);
-
-  const statusCounts: Record<string, number> = {};
-
-  byStatus.forEach((row) => {
-    statusCounts[row.status] = row._count.status;
-  });
-
-  const flaggedCount = safetyRows.filter(
-    (row) => row.status === "FLAGGED"
-  ).length;
 
   const flaggedRate = total > 0 ? flaggedCount / total : 0;
 
@@ -77,9 +81,9 @@ export async function getMetricsSummaryData(): Promise<SummaryData> {
     hallucination_rate: flaggedRate,
     toxicity_rate: flaggedRate,
     statuses: {
-      SUCCESS: statusCounts.SUCCESS ?? 0,
-      FAIL: statusCounts.FAIL ?? 0,
-      FLAGGED: statusCounts.FLAGGED ?? 0,
+      SUCCESS: successCount,
+      FAIL: failCount,
+      FLAGGED: flaggedCount,
     },
   };
 }
@@ -87,36 +91,45 @@ export async function getMetricsSummaryData(): Promise<SummaryData> {
 export async function getRealtimeSnapshot(): Promise<RealtimeSnapshot> {
   const since = new Date(Date.now() - 60 * 1000);
 
-  const [totalCalls, rows] = await Promise.all([
-    prisma.modelCall.count(),
+  const totalCalls = await prisma.modelCall.count();
 
-    prisma.modelCall.findMany({
-      where: {
-        createdAt: {
-          gte: since,
-        },
+  const rows: RealtimeMetricRow[] = await prisma.modelCall.findMany({
+    where: {
+      createdAt: {
+        gte: since,
       },
-      select: {
-        latencyMs: true,
-        status: true,
-        costUsd: true,
-      },
-    }),
-  ]);
+    },
+    select: {
+      latencyMs: true,
+      status: true,
+      costUsd: true,
+    },
+  });
 
   const calls = rows.length;
-  const errors = rows.filter((row) => row.status !== "SUCCESS").length;
+
+  const errors = rows.filter(
+    (row: RealtimeMetricRow) => row.status !== "SUCCESS"
+  ).length;
 
   const latencies = rows
-    .map((row) => row.latencyMs ?? 0)
-    .sort((a, b) => a - b);
+    .map((row: RealtimeMetricRow) => row.latencyMs ?? 0)
+    .sort((a: number, b: number) => a - b);
 
   const avgLatency = latencies.length
-    ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length)
+    ? Math.round(
+        latencies.reduce((sum: number, value: number) => sum + value, 0) /
+          latencies.length
+      )
     : 0;
 
   const cost60s = Number(
-    rows.reduce((sum, row) => sum + (row.costUsd ?? 0), 0).toFixed(6)
+    rows
+      .reduce(
+        (sum: number, row: RealtimeMetricRow) => sum + (row.costUsd ?? 0),
+        0
+      )
+      .toFixed(6)
   );
 
   return {

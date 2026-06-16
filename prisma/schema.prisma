@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -15,21 +16,21 @@ model User {
 }
 
 model ModelCall {
-  id            String         @id @default(cuid())
-  createdAt     DateTime       @default(now())
-  userId        String?
-  user          User?          @relation(fields: [userId], references: [id])
-  model         String
-  prompt        String
-  response      String
-  latencyMs     Int
-  promptTokens  Int
-  respTokens    Int
-  costUsd       Float          @default(0)
-  status        CallStatus     @default(SUCCESS)
-  hallucinated  Boolean        @default(false)
-  toxic         Boolean        @default(false)
-  evals         EvalResult[]
+  id           String       @id @default(cuid())
+  createdAt    DateTime     @default(now())
+  userId       String?
+  user         User?        @relation(fields: [userId], references: [id])
+  model        String
+  prompt       String
+  response     String
+  latencyMs    Int
+  promptTokens Int
+  respTokens   Int
+  costUsd      Float        @default(0)
+  status       CallStatus   @default(SUCCESS)
+  hallucinated Boolean      @default(false)
+  toxic        Boolean      @default(false)
+  evals        EvalResult[]
 
   @@index([createdAt])
   @@index([status, createdAt])
@@ -40,26 +41,26 @@ model ModelCall {
 }
 
 model EvalResult {
-  id        String      @id @default(cuid())
-  createdAt DateTime    @default(now())
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
   callId    String
-  call      ModelCall   @relation(fields: [callId], references: [id])
+  call      ModelCall @relation(fields: [callId], references: [id])
   kind      EvalKind
   passed    Boolean
   score     Float?
   details   String?
-  @@index([callId, kind])
+
   @@unique([callId, kind])
+  @@index([callId, kind])
 }
 
 model KnowledgeChunk {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
+  id        String                @id @default(cuid())
+  createdAt DateTime              @default(now())
   title     String
   content   String
-  embedding Unsupported("vector")  // 👈 tell Prisma it's a pgvector column
+  embedding Unsupported("vector") // 👈 tell Prisma it's a pgvector column
 }
-
 
 enum CallStatus {
   SUCCESS
@@ -68,9 +69,9 @@ enum CallStatus {
 }
 
 enum EvalKind {
-  HALLUCINATION   // (legacy simple check; keep if you’re using it)
+  HALLUCINATION // (legacy simple check; keep if you’re using it)
   TOXICITY
-  INJECTION       // prompt injection heuristics
-  PII             // PII/secret detection
-  GROUNDING       // RAG-grounded factuality
+  INJECTION // prompt injection heuristics
+  PII // PII/secret detection
+  GROUNDING // RAG-grounded factuality
 }

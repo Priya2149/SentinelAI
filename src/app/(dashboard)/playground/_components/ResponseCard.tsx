@@ -5,7 +5,7 @@ import {
   Copy,
   Loader2,
   Shield,
-  TerminalSquare,
+  SquareTerminal,
   XCircle,
 } from "lucide-react";
 import type { ApiResponse } from "@/types/playground";
@@ -28,7 +28,7 @@ export function ResponseCard({
       <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
-            <TerminalSquare className="h-4 w-4 text-indigo-600" />
+            <SquareTerminal className="h-4 w-4 text-indigo-600" />
           </div>
 
           <div>

@@ -1,4 +1,6 @@
 -- CreateTable
+CREATE EXTENSION IF NOT EXISTS vector;
+
 create table if not exists "KnowledgeChunk" (
   id text primary key,
   "createdAt" timestamp with time zone not null default now(),

@@ -22,7 +22,7 @@ export function buildMetricsStats(dailyData: DailyMetric[]): MetricsStats {
     dailyData.length > 0
       ? Math.round(
           dailyData.reduce((sum, day) => sum + day.avgLatencyMs, 0) /
-            dailyData.length
+            dailyData.length,
         )
       : 0;
 
@@ -72,7 +72,7 @@ export function buildComplianceReportData({
   const total = summaryData?.total ?? stats.totalCalls;
 
   const avgLatencyMs = Math.round(
-    summaryData?.avg_latency_ms ?? stats.avgLatency
+    summaryData?.avg_latency_ms ?? stats.avgLatency,
   );
 
   const estimatedCostUsd =
@@ -101,6 +101,9 @@ export function buildComplianceReportData({
     flaggedCount,
     toxicityRate,
     daily: dailyData,
-    window: undefined,
+    window: {
+      from: dailyData[0]?.date,
+      to: dailyData[dailyData.length - 1]?.date,
+    },
   };
 }

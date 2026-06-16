@@ -1,6 +1,21 @@
-import { PrismaClient, EvalKind } from "@prisma/client";
+import "dotenv/config";
 
-const prisma = new PrismaClient();
+import { PrismaClient, EvalKind } from "../src/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DIRECT_URL or DATABASE_URL is required for seeding");
+}
+
+const adapter = new PrismaPg({
+  connectionString,
+});
+
+const prisma = new PrismaClient({
+  adapter,
+});
 
 const USERS = ["alice@example.com", "bob@example.com", "carol@example.com"];
 
@@ -34,7 +49,6 @@ const SCENARIOS: Scenario[] = [
       },
     ],
   },
-
   {
     status: "FAIL",
     model: "gpt-4.1-mini",
@@ -50,7 +64,6 @@ const SCENARIOS: Scenario[] = [
       },
     ],
   },
-
   {
     status: "FLAGGED",
     model: "gpt-4.1",
@@ -66,7 +79,6 @@ const SCENARIOS: Scenario[] = [
       },
     ],
   },
-
   {
     status: "FLAGGED",
     model: "gpt-4o-mini",
@@ -82,7 +94,6 @@ const SCENARIOS: Scenario[] = [
       },
     ],
   },
-
   {
     status: "FLAGGED",
     model: "gpt-4.1-mini",
@@ -111,8 +122,8 @@ async function main() {
         where: { email },
         update: {},
         create: { email },
-      }),
-    ),
+      })
+    )
   );
 
   const now = new Date();
@@ -123,7 +134,7 @@ async function main() {
     userIndex++;
 
     const createdAt = new Date(
-      now.getTime() - scenario.minutesAgo * 60 * 1000,
+      now.getTime() - scenario.minutesAgo * 60 * 1000
     );
 
     const call = await prisma.modelCall.create({
@@ -139,22 +150,23 @@ async function main() {
         respTokens: randInt(80, 250),
         costUsd: randInt(1, 5) / 1000,
         hallucinated: scenario.evals.some(
-          (e) => e.kind === EvalKind.HALLUCINATION && !e.passed,
+          (evalItem) =>
+            evalItem.kind === EvalKind.HALLUCINATION && !evalItem.passed
         ),
         toxic: scenario.evals.some(
-          (e) => e.kind === EvalKind.TOXICITY && !e.passed,
+          (evalItem) => evalItem.kind === EvalKind.TOXICITY && !evalItem.passed
         ),
       },
     });
 
-    for (const e of scenario.evals) {
+    for (const evalItem of scenario.evals) {
       await prisma.evalResult.create({
         data: {
           callId: call.id,
-          kind: e.kind,
-          passed: e.passed,
-          score: e.score ?? null,
-          details: e.details ?? "",
+          kind: evalItem.kind,
+          passed: evalItem.passed,
+          score: evalItem.score ?? null,
+          details: evalItem.details ?? "",
         },
       });
     }
@@ -164,9 +176,11 @@ async function main() {
 }
 
 main()
-  .then(() => prisma.$disconnect())
-  .catch((err) => {
-    console.error(err);
-    prisma.$disconnect();
+  .then(async () => {
+    await prisma.$disconnect();
+  })
+  .catch(async (error) => {
+    console.error(error);
+    await prisma.$disconnect();
     process.exit(1);
   });
