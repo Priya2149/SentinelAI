@@ -7,7 +7,6 @@ import {
   Home,
   BarChart3,
   ListTree,
-  FileText,
   SquarePlay,
   ChevronLeft,
   X,

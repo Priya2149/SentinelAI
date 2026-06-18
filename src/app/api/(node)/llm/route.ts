@@ -33,7 +33,6 @@ export async function POST(req: Request) {
   const provider = b.provider ?? "ollama";
   const model = b.model ?? DEFAULT_OLLAMA_MODEL;
   const prompt = (b.prompt ?? "").trim();
-  const userId = b.userId; // optional, but we won't enforce FK
 
   if (!prompt) {
     return NextResponse.json({ error: "Prompt is required" }, { status: 400 });

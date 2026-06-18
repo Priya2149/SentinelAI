@@ -4,7 +4,6 @@ import {
   useCallback,
   useMemo,
   useState,
-  useEffect,
   type ReactNode,
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";

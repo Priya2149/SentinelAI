@@ -1,6 +1,4 @@
-// lib/seedDemoDataAggressive.ts
 // This version ALWAYS ensures fresh data from TODAY
-
 import { prisma } from "@/lib/prisma";
 
 const DEMO_MODELS = [
@@ -117,10 +115,9 @@ export async function ensureAlwaysFreshData() {
       
       // 8-12% error rate
       const shouldFail = Math.random() < 0.10;
-      const status = shouldFail ? "FAIL" : "OK";
-      const responseLength = shouldFail ? 0 : randomInt(200, 1500);
-      
-      // Match your schema: promptTokens, respTokens, CallStatus enum
+      // const status = shouldFail ? "FAIL" : "OK";
+      // const responseLength = shouldFail ? 0 : randomInt(200, 1500);
+    
       const promptTokens = randomInt(50, 500);
       const respTokens = shouldFail ? 0 : randomInt(100, 2500);
       
