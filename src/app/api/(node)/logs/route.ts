@@ -3,9 +3,9 @@ import { getLogsPageData } from "@/server/logs/logs.service";
 import type { LogsSearchParams } from "@/server/logs/logs.types";
 
 export const runtime = "nodejs";
-export const revalidate = 0;
 export const dynamic = "force-dynamic";
-export const maxDuration = 20;
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function GET(req: NextRequest) {
   try {

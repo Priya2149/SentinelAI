@@ -23,8 +23,8 @@ const DEMO_MODE = process.env.LLM_DEMO_MODE === "true";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
 export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function POST(req: Request) {
   const { prisma } = await import("@/lib/prisma");

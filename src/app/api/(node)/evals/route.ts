@@ -5,7 +5,8 @@ import { isToxic } from "@/lib/toxicity";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const revalidate = 0; 
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 export async function POST() {
   const { prisma } = await import("@/lib/prisma");
   try {
