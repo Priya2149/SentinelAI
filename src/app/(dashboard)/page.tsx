@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
+export const runtime = "nodejs";
 
 import { GettingStartedCard } from "./_components/GettingStartedCard";
 import { LatestCallsTable } from "./_components/LatestCallsTable";

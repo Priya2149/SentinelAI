@@ -59,7 +59,12 @@ function buildCounts(
 export async function getOverviewPageData(
   searchParams: OverviewSearchParams = {}
 ): Promise<OverviewPageData> {
+if (
+  process.env.NODE_ENV === "development" &&
+  process.env.SKIP_DEMO_SEED !== "true"
+) {
   await ensureAlwaysFreshData();
+}
 
   const requestedRange = parseOverviewRange(searchParams.range);
   let page = parseOverviewPage(searchParams.page);
