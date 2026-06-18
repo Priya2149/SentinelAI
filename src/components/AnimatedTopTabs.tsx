@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, BarChart3, ListTree, FileText, PlaySquare } from "lucide-react";
+import { Home, BarChart3, ListTree, FileText, SquarePlay } from "lucide-react";
 
 type Item = { href: string; label: string; icon?: React.ElementType };
 
@@ -12,7 +12,7 @@ const ITEMS: Item[] = [
   { href: "/metrics", label: "Metrics", icon: BarChart3 },
   { href: "/logs", label: "Logs", icon: ListTree },
   { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/playground", label: "Playground", icon: PlaySquare },
+  { href: "/playground", label: "Playground", icon: SquarePlay },
 ];
 
 export default function AnimatedTopTabs() {

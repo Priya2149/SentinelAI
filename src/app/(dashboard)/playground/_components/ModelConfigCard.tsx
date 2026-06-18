@@ -2,7 +2,7 @@
 
 import {
   Cpu,
-  KeySquare,
+  Key,
   Loader2,
   Rocket,
   Shield,
@@ -72,7 +72,7 @@ export function ModelConfigCard({
       <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-gray-100 dark:border-gray-800">
         <label className="flex flex-col gap-2 md:col-span-2">
           <span className="text-sm font-medium flex items-center gap-2">
-            <KeySquare className="h-4 w-4 text-gray-400" />
+            <Key className="h-4 w-4 text-gray-400" />
             Provider
           </span>
 

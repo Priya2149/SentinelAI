@@ -1,13 +1,5 @@
-import type { NextConfig } from 'next';
+import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  reactStrictMode: true,
-
-  experimental: {
-    esmExternals: 'loose',
-  },
-
-  transpilePackages: ['@react-pdf/renderer'],
-};
+const nextConfig: NextConfig = {};
 
 export default nextConfig;

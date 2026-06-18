@@ -8,7 +8,7 @@ import {
   BarChart3,
   ListTree,
   FileText,
-  PlaySquare,
+  SquarePlay,
   ChevronLeft,
   X,
   Activity,
@@ -73,7 +73,7 @@ const NAV: NavItem[] = [
   {
     href: "/playground",
     label: "Playground",
-    icon: PlaySquare,
+    icon: SquarePlay,
     description: "Test AI models",
     color: "from-red-500 to-pink-500",
   },
