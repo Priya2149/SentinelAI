@@ -114,7 +114,9 @@ export default function EvaluationDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">AI Safety Evaluation Dashboard</h2>
-          <p className="text-gray-600">Real-time monitoring of AI safety metrics</p>
+          <p className="text-gray-600">
+            Real-time monitoring of AI safety metrics
+          </p>
         </div>
         <div className="flex items-center space-x-4">
           <select
@@ -152,8 +154,8 @@ export default function EvaluationDashboard() {
             summary.overallPassRate >= 90
               ? "green"
               : summary.overallPassRate >= 70
-              ? "yellow"
-              : "red"
+                ? "yellow"
+                : "red"
           }
           subtitle="System safety score"
         />
@@ -165,8 +167,8 @@ export default function EvaluationDashboard() {
             summary.riskyCalls.length > 5
               ? "red"
               : summary.riskyCalls.length > 0
-              ? "yellow"
-              : "green"
+                ? "yellow"
+                : "green"
           }
           subtitle="High-risk calls flagged"
         />
@@ -183,18 +185,15 @@ export default function EvaluationDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Pass Rate by Evaluation Type */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold mb-4">Safety Check Performance</h3>
+          <h3 className="text-lg font-semibold mb-4">
+            Safety Check Performance
+          </h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={evalKindData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip
-                formatter={(value: number, name: string) => [
-                  name === "passRate" ? `${value.toFixed(1)}%` : value,
-                  name === "passRate" ? "Pass Rate" : name === "passed" ? "Passed" : "Failed",
-                ]}
-              />
+              <Tooltip formatter={formatSafetyTooltip} />
               <Bar dataKey="passed" fill="#10b981" name="passed" />
               <Bar dataKey="failed" fill="#ef4444" name="failed" />
             </BarChart>
@@ -203,26 +202,40 @@ export default function EvaluationDashboard() {
 
         {/* Trend Over Time */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold mb-4">Safety Trends (Last 7 Days)</h3>
+          <h3 className="text-lg font-semibold mb-4">
+            Safety Trends (Last 7 Days)
+          </h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={summary.recentTrends}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis
                 dataKey="date"
                 tickFormatter={(value) =>
-                  new Date(value).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+                  new Date(value).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })
                 }
               />
               <YAxis />
               <Tooltip
                 labelFormatter={(value) => new Date(value).toLocaleDateString()}
-                formatter={(value: number, name: string) => [
-                  name === "passRate" ? `${value.toFixed(1)}%` : value,
-                  name === "passRate" ? "Pass Rate" : name === "total" ? "Total Evals" : "Passed",
-                ]}
+                formatter={formatTrendTooltip}
               />
-              <Line type="monotone" dataKey="passRate" stroke="#8b5cf6" strokeWidth={3} name="passRate" />
-              <Line type="monotone" dataKey="total" stroke="#3b82f6" strokeWidth={2} name="total" />
+              <Line
+                type="monotone"
+                dataKey="passRate"
+                stroke="#8b5cf6"
+                strokeWidth={3}
+                name="passRate"
+              />
+              <Line
+                type="monotone"
+                dataKey="total"
+                stroke="#3b82f6"
+                strokeWidth={2}
+                name="total"
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -230,7 +243,9 @@ export default function EvaluationDashboard() {
         {/* Failure Distribution */}
         {pieData.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold mb-4">Safety Violations by Type</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Safety Violations by Type
+            </h3>
             <div className="h-[300px] flex items-center justify-center">
               <ResponsiveContainer width="80%" height="100%">
                 <PieChart>
@@ -247,14 +262,17 @@ export default function EvaluationDashboard() {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number, name: string) => [`${value} failures`, name]} />
+               <Tooltip formatter={formatPieTooltip} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
             <div className="flex justify-center space-x-4 mt-4">
               {pieData.map((item, index) => (
                 <div key={index} className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
                   <span className="text-sm text-gray-600">
                     {item.name} ({item.value})
                   </span>
@@ -283,7 +301,9 @@ export default function EvaluationDashboard() {
               <AlertTriangle className="h-5 w-5 text-red-500" />
               <span>High-Risk API Calls</span>
             </h3>
-            <p className="text-sm text-gray-600">Calls that failed multiple safety checks</p>
+            <p className="text-sm text-gray-600">
+              Calls that failed multiple safety checks
+            </p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -309,7 +329,9 @@ export default function EvaluationDashboard() {
               <tbody className="divide-y divide-gray-200">
                 {summary.riskyCalls.slice(0, 10).map((call) => (
                   <tr key={call.callId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm font-mono">{call.callId.slice(0, 8)}...</td>
+                    <td className="px-6 py-4 text-sm font-mono">
+                      {call.callId.slice(0, 8)}...
+                    </td>
                     <td className="px-6 py-4 text-sm">
                       {new Date(call.timestamp).toLocaleString()}
                     </td>
@@ -331,8 +353,8 @@ export default function EvaluationDashboard() {
                           call.riskScore >= 75
                             ? "text-red-600"
                             : call.riskScore >= 50
-                            ? "text-yellow-600"
-                            : "text-green-600"
+                              ? "text-yellow-600"
+                              : "text-green-600"
                         }`}
                       >
                         {call.riskScore}
@@ -442,7 +464,61 @@ function getKindColor(kind: string): string {
   };
   return colors[kind] || "#6b7280";
 }
+function toNumber(value: unknown): number {
+  if (typeof value === "number") return value;
 
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+}
+
+function formatSafetyTooltip(
+  value: unknown,
+  name: unknown
+): [string | number, string] {
+  const key = String(name);
+  const numericValue = toNumber(value);
+
+  return [
+    key === "passRate" ? `${numericValue.toFixed(1)}%` : numericValue,
+    key === "passRate"
+      ? "Pass Rate"
+      : key === "passed"
+      ? "Passed"
+      : key === "failed"
+      ? "Failed"
+      : key,
+  ];
+}
+
+function formatTrendTooltip(
+  value: unknown,
+  name: unknown
+): [string | number, string] {
+  const key = String(name);
+  const numericValue = toNumber(value);
+
+  return [
+    key === "passRate" ? `${numericValue.toFixed(1)}%` : numericValue,
+    key === "passRate"
+      ? "Pass Rate"
+      : key === "total"
+      ? "Total Evals"
+      : key === "passed"
+      ? "Passed"
+      : key,
+  ];
+}
+
+function formatPieTooltip(
+  value: unknown,
+  name: unknown
+): [string, string] {
+  return [`${toNumber(value)} failures`, String(name)];
+}
 function getKindBgColor(kind: string): string {
   const colors: { [key: string]: string } = {
     INJECTION: "bg-red-100",
