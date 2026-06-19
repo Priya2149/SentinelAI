@@ -91,7 +91,7 @@ if (
 
   return {
     range: countData.range,
-    since: countData.since,
+    since: countData.since.toISOString(),
     page,
     pageSize: PAGE_SIZE,
     totalPages,
