@@ -2,52 +2,47 @@
 
 import { useTheme } from "next-themes";
 import { Moon, Sun, Menu } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import NotificationsBell from "./NotificationsBell";
 import { SidebarMobile } from "./sidebar";
 import { FeedbackModal } from "./FeedbackModal";
 
-/** If you have next-auth, you can wire real user info here.
- *  For now, this is a simple hook with optional overrides. */
-function useCurrentUser() {
-  // TODO: replace with next-auth's useSession() if you have it
-  const [user] = useState<{
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-  }>({
-    // try to read demo values that you might set somewhere else
-    name:
-      (typeof window !== "undefined" && localStorage.getItem("user.name")) ||
-      null,
-    email:
-      (typeof window !== "undefined" && localStorage.getItem("user.email")) ||
-      "user@example.com",
-    image:
-      (typeof window !== "undefined" && localStorage.getItem("user.image")) ||
-      null,
-  });
-  return user;
-}
+// function useCurrentUser() {
+//   const [user] = useState<{
+//     name?: string | null;
+//     email?: string | null;
+//     image?: string | null;
+//   }>({
+//     name:
+//       (typeof window !== "undefined" && localStorage.getItem("user.name")) ||
+//       null,
+//     email:
+//       (typeof window !== "undefined" && localStorage.getItem("user.email")) ||
+//       "user@example.com",
+//     image:
+//       (typeof window !== "undefined" && localStorage.getItem("user.image")) ||
+//       null,
+//   });
+//   return user;
+// }
 
-function initialsFrom(name?: string | null, email?: string | null) {
-  const n = (name ?? "").trim();
-  if (n) {
-    const parts = n.split(" ").filter(Boolean);
-    const a = parts[0]?.[0];
-    const b = parts.length > 1 ? parts[parts.length - 1][0] : "";
-    return (a + (b || "")).toUpperCase();
-  }
-  const e = (email ?? "").trim();
-  if (e) return e[0].toUpperCase();
-  return "U";
-}
+// function initialsFrom(name?: string | null, email?: string | null) {
+//   const n = (name ?? "").trim();
+//   if (n) {
+//     const parts = n.split(" ").filter(Boolean);
+//     const a = parts[0]?.[0];
+//     const b = parts.length > 1 ? parts[parts.length - 1][0] : "";
+//     return (a + (b || "")).toUpperCase();
+//   }
+//   const e = (email ?? "").trim();
+//   if (e) return e[0].toUpperCase();
+//   return "U";
+// }
 
 export function Topbar() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [avatarOpen, setAvatarOpen] = useState(false);
    const [feedbackOpen, setFeedbackOpen] = useState(false);
   const FEEDBACK_FORM_URL =
     "https://docs.google.com/forms/d/e/1FAIpQLSekxYrjOMkZhLxzX0l9XRt3MCLsmHkjdau5SCEwA1opVBllzA/viewform?usp=header";
@@ -55,11 +50,11 @@ export function Topbar() {
   useEffect(() => setMounted(true), []);
   const isDark = theme === "dark";
 
-  const user = useCurrentUser();
-  const initials = useMemo(
-    () => initialsFrom(user.name, user.email),
-    [user.name, user.email]
-  );
+  //const user = useCurrentUser();
+  // const initials = useMemo(
+  //   () => initialsFrom(user.name, user.email),
+  //   [user.name, user.email]
+  // );
 
   return (
     <>

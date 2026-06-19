@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   Area,
   AreaChart,
@@ -34,10 +35,10 @@ function ChartCard({
 }: {
   title: string;
   description: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-4">
+    <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-3.5 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-4">
       <div className="mb-2.5">
         <h3 className="text-sm font-semibold sm:text-base">{title}</h3>
         <p className="text-xs text-muted-foreground">{description}</p>
@@ -48,7 +49,18 @@ function ChartCard({
   );
 }
 
-function TooltipShell({ children }: { children: React.ReactNode }) {
+function ChartFrame({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="h-[180px] min-h-[180px] w-full min-w-0"
+      style={{ height: CHART_HEIGHT }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function TooltipShell({ children }: { children: ReactNode }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-700 shadow-xl dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
       {children}
@@ -128,29 +140,36 @@ function CallsChart({
   gradientId: string;
 }) {
   return (
-    <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-      <AreaChart data={data}>
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-          </linearGradient>
-        </defs>
+    <ChartFrame>
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <AreaChart data={data}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+            </linearGradient>
+          </defs>
 
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="date" stroke="#6b7280" fontSize={11} tickFormatter={formatTick} />
-        <YAxis stroke="#6b7280" fontSize={11} />
-        <Tooltip content={<CallsTooltip />} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis
+            dataKey="date"
+            stroke="#6b7280"
+            fontSize={11}
+            tickFormatter={formatTick}
+          />
+          <YAxis stroke="#6b7280" fontSize={11} />
+          <Tooltip content={<CallsTooltip />} />
 
-        <Area
-          type="monotone"
-          dataKey="calls"
-          stroke="#3b82f6"
-          strokeWidth={2}
-          fill={`url(#${gradientId})`}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
+          <Area
+            type="monotone"
+            dataKey="calls"
+            stroke="#3b82f6"
+            strokeWidth={2}
+            fill={`url(#${gradientId})`}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </ChartFrame>
   );
 }
 
@@ -162,77 +181,93 @@ function CostChart({
   gradientId: string;
 }) {
   return (
-    <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-      <AreaChart data={data}>
-        <defs>
-          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-          </linearGradient>
-        </defs>
+    <ChartFrame>
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <AreaChart data={data}>
+          <defs>
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+            </linearGradient>
+          </defs>
 
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="date" stroke="#6b7280" fontSize={11} tickFormatter={formatTick} />
-        <YAxis stroke="#6b7280" fontSize={11} />
-        <Tooltip content={<CostTooltip />} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis
+            dataKey="date"
+            stroke="#6b7280"
+            fontSize={11}
+            tickFormatter={formatTick}
+          />
+          <YAxis stroke="#6b7280" fontSize={11} />
+          <Tooltip content={<CostTooltip />} />
 
-        <Area
-          type="monotone"
-          dataKey="costUsd"
-          stroke="#10b981"
-          strokeWidth={2}
-          fill={`url(#${gradientId})`}
-        />
-      </AreaChart>
-    </ResponsiveContainer>
+          <Area
+            type="monotone"
+            dataKey="costUsd"
+            stroke="#10b981"
+            strokeWidth={2}
+            fill={`url(#${gradientId})`}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </ChartFrame>
   );
 }
 
 function LatencyChart({ data }: { data: DailyMetric[] }) {
   return (
-    <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-      <LineChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="date" stroke="#6b7280" fontSize={11} tickFormatter={formatTick} />
-        <YAxis stroke="#6b7280" fontSize={11} />
-        <Tooltip content={<LatencyTooltip />} />
+    <ChartFrame>
+      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis
+            dataKey="date"
+            stroke="#6b7280"
+            fontSize={11}
+            tickFormatter={formatTick}
+          />
+          <YAxis stroke="#6b7280" fontSize={11} />
+          <Tooltip content={<LatencyTooltip />} />
 
-        <Line
-          type="monotone"
-          dataKey="avgLatencyMs"
-          stroke="#8b5cf6"
-          strokeWidth={2.2}
-          dot={{ fill: "#8b5cf6", strokeWidth: 2, r: 3.5 }}
-          activeDot={{ r: 5, stroke: "#8b5cf6", strokeWidth: 2 }}
-        />
-      </LineChart>
-    </ResponsiveContainer>
+          <Line
+            type="monotone"
+            dataKey="avgLatencyMs"
+            stroke="#8b5cf6"
+            strokeWidth={2.2}
+            dot={{ fill: "#8b5cf6", strokeWidth: 2, r: 3.5 }}
+            activeDot={{ r: 5, stroke: "#8b5cf6", strokeWidth: 2 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </ChartFrame>
   );
 }
 
 function ErrorPieChart({ data }: { data: PieDataItem[] }) {
   return (
     <>
-      <div className="flex h-[180px] items-center justify-center">
-        <ResponsiveContainer width="80%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius={45}
-              outerRadius={80}
-              paddingAngle={5}
-              dataKey="value"
-            >
-              {data.map((entry, index) => (
-                <Cell key={index} fill={entry.color} />
-              ))}
-            </Pie>
+      <div className="flex h-[180px] min-h-[180px] w-full min-w-0 items-center justify-center">
+        <div className="h-full w-full max-w-[420px] min-w-0">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                innerRadius={45}
+                outerRadius={80}
+                paddingAngle={5}
+                dataKey="value"
+              >
+                {data.map((entry, index) => (
+                  <Cell key={index} fill={entry.color} />
+                ))}
+              </Pie>
 
-            <Tooltip content={<PieTooltip />} />
-          </PieChart>
-        </ResponsiveContainer>
+              <Tooltip content={<PieTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap justify-center gap-3">
@@ -259,53 +294,47 @@ export function MetricsCharts({
   dailyData: DailyMetric[];
   pieData: PieDataItem[];
 }) {
+  const charts = [
+    {
+      key: "calls",
+      title: "API Calls Trend",
+      description: "Daily API call volume",
+      content: <CallsChart data={dailyData} gradientId="callsGradient" />,
+    },
+    {
+      key: "cost",
+      title: "Cost Analysis",
+      description: "Daily spending trends",
+      content: <CostChart data={dailyData} gradientId="costGradient" />,
+    },
+    {
+      key: "latency",
+      title: "Response Time",
+      description: "Average latency performance",
+      content: <LatencyChart data={dailyData} />,
+    },
+    {
+      key: "errors",
+      title: "Error Distribution",
+      description: "Success vs failure rates",
+      content: <ErrorPieChart data={pieData} />,
+    },
+  ];
+
   return (
-    <>
-      <div className="hidden lg:grid lg:grid-cols-2 lg:gap-3 xl:gap-4">
-        <ChartCard title="API Calls Trend" description="Daily API call volume">
-          <CallsChart data={dailyData} gradientId="callsGradient" />
-        </ChartCard>
-
-        <ChartCard title="Cost Analysis" description="Daily spending trends">
-          <CostChart data={dailyData} gradientId="costGradient" />
-        </ChartCard>
-
-        <ChartCard title="Response Time" description="Average latency performance">
-          <LatencyChart data={dailyData} />
-        </ChartCard>
-
-        <ChartCard title="Error Distribution" description="Success vs failure rates">
-          <ErrorPieChart data={pieData} />
-        </ChartCard>
+    <div className="-mx-3 overflow-x-auto pb-1.5 sm:mx-0">
+      <div className="flex gap-3 px-3 sm:gap-4 sm:px-0 lg:grid lg:grid-cols-2 xl:gap-4">
+        {charts.map((chart) => (
+          <div
+            key={chart.key}
+            className="min-w-[260px] max-w-sm flex-1 lg:min-w-0 lg:max-w-none"
+          >
+            <ChartCard title={chart.title} description={chart.description}>
+              {chart.content}
+            </ChartCard>
+          </div>
+        ))}
       </div>
-
-      <div className="-mx-3 overflow-x-auto pb-1.5 sm:mx-0 lg:hidden">
-        <div className="flex gap-3 px-3 sm:gap-4">
-          <div className="min-w-[260px] max-w-sm flex-1">
-            <ChartCard title="API Calls Trend" description="Daily API call volume">
-              <CallsChart data={dailyData} gradientId="callsGradientMobile" />
-            </ChartCard>
-          </div>
-
-          <div className="min-w-[260px] max-w-sm flex-1">
-            <ChartCard title="Cost Analysis" description="Daily spending trends">
-              <CostChart data={dailyData} gradientId="costGradientMobile" />
-            </ChartCard>
-          </div>
-
-          <div className="min-w-[260px] max-w-sm flex-1">
-            <ChartCard title="Response Time" description="Average latency performance">
-              <LatencyChart data={dailyData} />
-            </ChartCard>
-          </div>
-
-          <div className="min-w-[260px] max-w-sm flex-1">
-            <ChartCard title="Error Distribution" description="Success vs failure rates">
-              <ErrorPieChart data={pieData} />
-            </ChartCard>
-          </div>
-        </div>
-      </div>
-    </>
+    </div>
   );
 }

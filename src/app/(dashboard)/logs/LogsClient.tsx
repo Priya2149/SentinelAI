@@ -64,15 +64,15 @@ function csvEscape(cell: string): string {
   return /[",\n]/.test(cell) ? `"${cell.replace(/"/g, '""')}"` : cell;
 }
 
-function formatRelativeTime(d: Date | string): string {
-  const now = new Date();
-  const date = new Date(d);
-  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
+// function formatRelativeTime(d: Date | string): string {
+//   const now = new Date();
+//   const date = new Date(d);
+//   const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+//   if (diff < 60) return `${diff}s ago`;
+//   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+//   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+//   return `${Math.floor(diff / 86400)}d ago`;
+// }
 
 export default function LogsClient({
  initialRows,
