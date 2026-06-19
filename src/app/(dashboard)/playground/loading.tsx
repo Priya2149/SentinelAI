@@ -7,12 +7,10 @@ function Skeleton({ className = "" }: { className?: string }) {
 }
 
 function WhiteSkeleton({ className = "" }: { className?: string }) {
-  return (
-    <div className={`animate-pulse rounded-md bg-white/25 ${className}`} />
-  );
+  return <div className={`animate-pulse rounded-md bg-white/25 ${className}`} />;
 }
 
-export default function Loading() {
+export default function PlaygroundLoading() {
   return (
     <div className="space-y-6 p-0 md:p-6">
       <div className="relative overflow-hidden rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 text-white shadow-2xl">
@@ -61,6 +59,12 @@ export default function Loading() {
             <Skeleton className="h-5 w-24" />
             <Skeleton className="h-40 rounded-xl" />
             <Skeleton className="h-11 w-full rounded-xl" />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Skeleton className="h-14 rounded-xl" />
+              <Skeleton className="h-14 rounded-xl" />
+              <Skeleton className="h-14 rounded-xl" />
+            </div>
           </div>
         </div>
 
@@ -81,6 +85,7 @@ export default function Loading() {
 
           <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <Skeleton className="h-6 w-36" />
+
             <div className="mt-5 space-y-3">
               {Array.from({ length: 4 }).map((_, index) => (
                 <Skeleton key={index} className="h-14 rounded-xl" />

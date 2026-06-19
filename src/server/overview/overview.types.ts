@@ -17,7 +17,7 @@ export type OverviewSearchParams = {
 
 export type OverviewCallRow = {
   id: string;
-  createdAt: Date;
+  createdAt: string;
   model: string;
   latencyMs: number;
   promptTokens: number;
@@ -38,7 +38,7 @@ export type OverviewCounts = {
 
 export type OverviewPageData = {
   range: RangeKey;
-  since: Date;
+  since: string;
   page: number;
   pageSize: number;
   totalPages: number;

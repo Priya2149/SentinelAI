@@ -1,10 +1,11 @@
-import type { ReactNode } from "react";
-import Sidebar from "@/components/sidebar";
-import Topbar from "@/components/topbar";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
+
+import type { ReactNode } from "react";
+import Sidebar from "@/components/sidebar";
+import { Topbar } from "@/components/topbar";
 
 export default function DashboardLayout({
   children,
@@ -16,7 +17,7 @@ export default function DashboardLayout({
       <Sidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
-       <Topbar>{null}</Topbar>
+        <Topbar />
 
         <main className="relative flex-1">
           <div className="min-h-screen p-4 md:p-6 lg:p-8">

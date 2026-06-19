@@ -96,7 +96,21 @@ if (
     pageSize: PAGE_SIZE,
     totalPages,
     skip,
-    latest,
+    latest: latest.map((row) => ({
+  id: row.id,
+  createdAt: row.createdAt.toISOString(),
+  model: row.model,
+  latencyMs: row.latencyMs,
+  promptTokens: row.promptTokens,
+  respTokens: row.respTokens,
+  costUsd: Number(row.costUsd),
+  status: row.status,
+  user: row.user
+    ? {
+        email: row.user.email,
+      }
+    : null,
+})),
     counts: buildCounts(countData.counts, countData.total),
     refreshHref: `?range=${countData.range}&page=1&ts=${Date.now()}`,
   };
