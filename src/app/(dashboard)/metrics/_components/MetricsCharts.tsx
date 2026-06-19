@@ -15,10 +15,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type {
-  DailyMetric,
-  PieDataItem,
-} from "@/server/metrics/metrics.types";
+import type { DailyMetric, PieDataItem } from "@/server/metrics/metrics.types";
 
 const CHART_HEIGHT = 180;
 
@@ -141,7 +138,12 @@ function CallsChart({
 }) {
   return (
     <ChartFrame>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveContainer
+        width="100%"
+        height={CHART_HEIGHT}
+        minWidth={1}
+        minHeight={CHART_HEIGHT}
+      >
         <AreaChart data={data}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -182,7 +184,12 @@ function CostChart({
 }) {
   return (
     <ChartFrame>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveContainer
+        width="100%"
+        height={CHART_HEIGHT}
+        minWidth={1}
+        minHeight={CHART_HEIGHT}
+      >
         <AreaChart data={data}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -217,7 +224,12 @@ function CostChart({
 function LatencyChart({ data }: { data: DailyMetric[] }) {
   return (
     <ChartFrame>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <ResponsiveContainer
+        width="100%"
+        height={CHART_HEIGHT}
+        minWidth={1}
+        minHeight={CHART_HEIGHT}
+      >
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis
@@ -248,7 +260,12 @@ function ErrorPieChart({ data }: { data: PieDataItem[] }) {
     <>
       <div className="flex h-[180px] min-h-[180px] w-full min-w-0 items-center justify-center">
         <div className="h-full w-full max-w-[420px] min-w-0">
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+          <ResponsiveContainer
+            width="100%"
+            height={CHART_HEIGHT}
+            minWidth={1}
+            minHeight={CHART_HEIGHT}
+          >
             <PieChart>
               <Pie
                 data={data}
