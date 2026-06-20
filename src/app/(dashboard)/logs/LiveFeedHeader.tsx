@@ -3,23 +3,24 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Switch } from "@/components/ui/switch";
+import { ClientRelativeTime } from "@/components/system/client-relative-time";
 
 type LiveFeedHeaderProps = {
   entriesLabel: string;
   lastUpdated: Date | string;
 };
 
-function formatRelativeTime(value: Date | string): string {
-  const now = new Date();
-  const date = new Date(value);
-  const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+// function formatRelativeTime(value: Date | string): string {
+//   const now = new Date();
+//   const date = new Date(value);
+//   const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+//   if (diff < 60) return `${diff}s ago`;
+//   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+//   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
 
-  return `${Math.floor(diff / 86400)}d ago`;
-}
+//   return `${Math.floor(diff / 86400)}d ago`;
+// }
 
 export default function LiveFeedHeader({
   entriesLabel,
@@ -29,7 +30,7 @@ export default function LiveFeedHeader({
 
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [lastUpdatedLabel, setLastUpdatedLabel] = useState(
-    formatRelativeTime(lastUpdated)
+    <ClientRelativeTime date={lastUpdated} />
   );
 
   useEffect(() => {
@@ -57,10 +58,10 @@ export default function LiveFeedHeader({
   }, [autoRefresh, router]);
 
   useEffect(() => {
-    setLastUpdatedLabel(formatRelativeTime(lastUpdated));
+    setLastUpdatedLabel(<ClientRelativeTime date={lastUpdated} />);
 
     const intervalId = window.setInterval(() => {
-      setLastUpdatedLabel(formatRelativeTime(lastUpdated));
+      setLastUpdatedLabel(<ClientRelativeTime date={lastUpdated} />);
     }, 30_000);
 
     return () => window.clearInterval(intervalId);
