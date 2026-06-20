@@ -2,7 +2,7 @@
 
 import { RouteError } from "@/components/system/route-error";
 
-export default function MetricsError({
+export default function LogsError({
   error,
   reset,
 }: {
@@ -11,8 +11,8 @@ export default function MetricsError({
 }) {
   return (
     <RouteError
-      title="Could not load metrics"
-      description="Metrics, charts, or report data could not be loaded."
+      title="Could not load logs"
+      description="Log data could not be loaded. Try refreshing or adjusting filters."
       error={error}
       reset={reset}
     />
