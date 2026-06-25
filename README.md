@@ -146,3 +146,9 @@ This project includes a focused testing setup covering unit, component, hook, AP
 ## Status
 
 This is a portfolio project built to demonstrate production-style full-stack engineering, dashboard design, testing strategy, and deployment readiness for AI governance and observability use cases.
+
+## Author
+Built by **Priya Prajapati** as a portfolio project to demonstrate full-stack, backend, cloud, testing, and deployment skills.
+
+- LinkedIn: https://www.linkedin.com/in/prajapatipriya/
+- GitHub: https://github.com/Priya2149
