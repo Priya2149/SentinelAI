@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ensureDemoData } from "@/server/demo/demo-data.service";
 import type {
   AnalyticsPageData,
   AnalyticsQueryParams,
@@ -108,6 +109,8 @@ export async function getAnalyticsPageData(
   params: AnalyticsQueryParams = {}
 ): Promise<AnalyticsPageData> {
   try {
+    await ensureDemoData();
+
     const [byModel, byUser] = await Promise.all([
       getAnalyticsModelRows(params),
       getAnalyticsUserRows(params),

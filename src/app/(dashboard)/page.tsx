@@ -23,7 +23,7 @@ export default async function Page({
     <div className="relative isolate min-h-full p-0 sm:p-4">
       <OverviewHero range={data.range} refreshHref={data.refreshHref} />
 
-      <GettingStartedCard />
+     {data.counts.total === 0 ? <GettingStartedCard /> : null}
 
       <OverviewKpiGrid counts={data.counts} range={data.range} />
 

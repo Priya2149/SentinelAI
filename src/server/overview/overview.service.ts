@@ -1,6 +1,6 @@
 import "server-only";
 
-import { ensureAlwaysFreshData } from "@/lib/seedDemoDataAggressive";
+import { ensureDemoData } from "@/server/demo/demo-data.service";
 import {
   RANGE_MS,
   type OverviewCounts,
@@ -59,12 +59,7 @@ function buildCounts(
 export async function getOverviewPageData(
   searchParams: OverviewSearchParams = {}
 ): Promise<OverviewPageData> {
-if (
-  process.env.NODE_ENV === "development" &&
-  process.env.SKIP_DEMO_SEED !== "true"
-) {
-  await ensureAlwaysFreshData();
-}
+  await ensureDemoData();
 
   const requestedRange = parseOverviewRange(searchParams.range);
   let page = parseOverviewPage(searchParams.page);
@@ -97,20 +92,20 @@ if (
     totalPages,
     skip,
     latest: latest.map((row) => ({
-  id: row.id,
-  createdAt: row.createdAt.toISOString(),
-  model: row.model,
-  latencyMs: row.latencyMs,
-  promptTokens: row.promptTokens,
-  respTokens: row.respTokens,
-  costUsd: Number(row.costUsd),
-  status: row.status,
-  user: row.user
-    ? {
-        email: row.user.email,
-      }
-    : null,
-})),
+      id: row.id,
+      createdAt: row.createdAt.toISOString(),
+      model: row.model,
+      latencyMs: row.latencyMs,
+      promptTokens: row.promptTokens,
+      respTokens: row.respTokens,
+      costUsd: Number(row.costUsd),
+      status: row.status,
+      user: row.user
+        ? {
+            email: row.user.email,
+          }
+        : null,
+    })),
     counts: buildCounts(countData.counts, countData.total),
     refreshHref: `?range=${countData.range}&page=1&ts=${Date.now()}`,
   };

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ensureDemoData } from "@/server/demo/demo-data.service";
 import type { LogsPageData, LogsSearchParams } from "./logs.types";
 import { buildLogsWhere, parseLogsFilters } from "./logs.filters";
 import {
@@ -12,6 +13,8 @@ import { mapModelCallToLogRow } from "./logs.utils";
 export async function getLogsPageData(
   searchParams: LogsSearchParams
 ): Promise<LogsPageData> {
+  await ensureDemoData();
+
   const filters = parseLogsFilters(searchParams);
   const where = buildLogsWhere(filters);
 

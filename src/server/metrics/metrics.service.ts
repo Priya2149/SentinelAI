@@ -1,5 +1,6 @@
 import "server-only";
 
+import { ensureDemoData } from "@/server/demo/demo-data.service";
 import type { DailyResponse } from "./metrics.types";
 import { getDefaultDailyRange, parseDate } from "./metrics.filters";
 import {
@@ -15,6 +16,8 @@ export async function getDailyMetrics({
   from?: string | null;
   to?: string | null;
 }): Promise<DailyResponse> {
+  await ensureDemoData();
+
   const parsedFrom = parseDate(from ?? null);
   const parsedTo = parseDate(to ?? null);
 
@@ -50,9 +53,13 @@ export async function getDailyMetrics({
 }
 
 export async function getMetricsSummary() {
+  await ensureDemoData();
+
   return getMetricsSummaryData();
 }
 
 export async function getMetricsRealtimeSnapshot() {
+  await ensureDemoData();
+
   return getRealtimeSnapshot();
 }
